@@ -1,0 +1,376 @@
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
+import { handleTelegramChatWithGemini, rotateGeminiKey, getKeysCount } from '@/lib/gemini'
+
+// Helper untuk fetch file dari Telegram
+async function getTelegramFileBase64(fileId: string): Promise<{ base64: string, mimeType: string }> {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
+  if (!token) throw new Error("TELEGRAM_BOT_TOKEN tidak ditemukan")
+
+  // 1. Dapatkan file_path menggunakan POST agar tidak di-cache oleh Next.js
+  const res = await fetch(`https://api.telegram.org/bot${token}/getFile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_id: fileId })
+  })
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`HTTP ${res.status}. Response: ${errText}. Token prefix: ${token.substring(0,5)}`)
+  }
+  
+  const data = await res.json()
+  if (!data.ok) throw new Error(`Telegram API Error: ${data.description || 'Unknown'}`)
+
+  const filePath = data.result.file_path
+  if (!filePath) throw new Error("file_path tidak ada di respons Telegram")
+  
+  // 2. Download file aktual
+  const fileRes = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, { cache: 'no-store' })
+  if (!fileRes.ok) throw new Error(`Gagal download file: HTTP ${fileRes.status}`)
+
+  const arrayBuffer = await fileRes.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  const base64 = buffer.toString('base64')
+
+  // Tentukan mimeType sederhana berdasarkan ekstensi filePath
+  let mimeType = 'application/octet-stream'
+  if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) mimeType = 'image/jpeg'
+  else if (filePath.endsWith('.png')) mimeType = 'image/png'
+  else if (filePath.endsWith('.ogg') || filePath.endsWith('.oga')) mimeType = 'audio/ogg'
+  else if (filePath.endsWith('.mp3')) mimeType = 'audio/mpeg'
+
+  return { base64, mimeType }
+}
+
+// Fungsi pembantu kirim notifikasi error ke admin
+async function notifyAdmin(errorMsg: string) {
+  const adminId = process.env.ADMIN_TELEGRAM_ID
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (adminId && token) {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: adminId,
+        text: `⚠️ *SYSTEM ERROR*\n\n${errorMsg}`,
+        parse_mode: 'Markdown'
+      })
+    })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let chatId = 0
+  
+  try {
+    const body = await request.json()
+    const { message } = body
+
+    if (!message || !message.chat) {
+      return NextResponse.json({ ok: true })
+    }
+
+    chatId = message.chat.id
+    
+    // Gunakan Service Role Key untuk bypass RLS
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Deteksi tipe input: text, photo, atau voice
+    const isVoice = !!message.voice
+    const isPhoto = !!message.photo && message.photo.length > 0
+    let text = (message.text || message.caption || '').trim()
+
+    // Handle perintah Start
+    if (text.startsWith('/start')) {
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `🤖 Halo! Saya FinMate AI Bot.\n\nUntuk menghubungkan akun Anda, masuk ke web app dan dapatkan kode verifikasi di menu Pengaturan > Telegram Bot.\n\nKirim kode verifikasi Anda: FIN-XXXXXX`
+      })
+    }
+
+    // Handle Verification Code
+    if (text.startsWith('FIN-')) {
+      const code = text.replace('FIN-', '').toLowerCase()
+      
+      const { data: profiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+
+      const match = profiles?.find(p => p.id.toLowerCase().startsWith(code))
+
+      if (match) {
+        await supabaseAdmin.from('profiles').update({ telegram_id: chatId.toString() }).eq('id', match.id)
+        
+        // Simpan Admin ID jika ini adalah user pertama (opsional, tapi berguna)
+        if (!process.env.ADMIN_TELEGRAM_ID && match) {
+          console.log(`SET ADMIN ID IN ENV: ${chatId}`);
+          // Di production sesungguhnya kita menyimpan roles di DB, tapi ini untuk demonstrasi
+        }
+        
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `✅ Akun Anda berhasil terhubung!\n\nSekarang Anda bisa mulai mencatat transaksi dengan cerdas.\n\nContoh:\n💬 Teks: "makan siang 35rb"\n🎤 Voice Note: "tadi beli bensin 50 ribu"\n📸 Foto struk belanja\n\nKetik /help untuk panduan lengkap.`
+        })
+      } else {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `❌ Kode verifikasi tidak valid atau kedaluwarsa.`
+        })
+      }
+    }
+
+    // Cek apakah user terdaftar
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name')
+      .eq('telegram_id', chatId.toString())
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `❌ Akun Telegram Anda belum terhubung dengan FinMate AI.\n\nBuka web app dan hubungkan di Pengaturan > Telegram Bot.`
+      })
+    }
+
+    // Command Standar Laporan
+    if (text === '/laporan' || text === '/report') {
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      
+      const { data: txs } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount, category_name')
+        .eq('user_id', profile.id)
+        .gte('date', monthStart)
+
+      const income = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expense = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const savings = income - expense
+
+      const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' })
+      
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `📊 *Laporan ${monthName}*\n\n` +
+          `💚 Pemasukan: Rp${income.toLocaleString('id-ID')}\n` +
+          `❤️ Pengeluaran: Rp${expense.toLocaleString('id-ID')}\n` +
+          `💙 Tabungan: Rp${savings.toLocaleString('id-ID')}\n\n` +
+          `📱 Lihat detail di web app!`,
+        parse_mode: 'Markdown'
+      })
+    }
+
+    // Handle /saldo command
+    if (text === '/saldo' || text === '/balance') {
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      
+      const { data: txs } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount')
+        .eq('user_id', profile.id)
+        .gte('date', monthStart)
+
+      const income = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expense = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `💰 Saldo bulan ini: *Rp${(income - expense).toLocaleString('id-ID')}*\n\n(Pemasukan: Rp${income.toLocaleString('id-ID')} | Pengeluaran: Rp${expense.toLocaleString('id-ID')})`,
+        parse_mode: 'Markdown'
+      })
+    }
+
+    if (text === '/help' || text === '/start') {
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `🤖 *FinMate AI Bot — Panduan*\n\n` +
+          `*Catat Transaksi:*\n` +
+          `💬 Ketik: "makan siang 35rb"\n` +
+          `💬 Ketik: "terima gaji 5jt"\n` +
+          `📸 Kirim foto struk → AI baca otomatis\n` +
+          `🎤 Kirim voice note → ditranskripsi & dicatat\n\n` +
+          `*Perintah Khusus:*\n` +
+          `/laporan - Ringkasan bulan ini\n` +
+          `/saldo - Cek saldo saat ini\n` +
+          `/help - Panduan penggunaan\n\n` +
+          `_(ID Telegram Anda: \`${chatId}\`)_`,
+        parse_mode: 'Markdown'
+      })
+    }
+
+    // PROCESSING AI GEMINI (Text, Voice, Photo)
+    if (text || isVoice || isPhoto) {
+      // Send temporary "typing" or processing message
+      // Note: In Next.js serverless we can't easily stream replies to Webhook, 
+      // but we can send a loading message using Telegram API directly before waiting for Gemini
+      const token = process.env.TELEGRAM_BOT_TOKEN
+      if (token) {
+        await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, action: 'typing' })
+        })
+      }
+
+      let mediaBase64: string | undefined
+      let mimeType: string | undefined
+      let userPrompt = text || 'Tolong ekstrak transaksi dari media ini.'
+
+      if (isPhoto) {
+        try {
+          // Ambil resolusi terbesar
+          const fileId = message.photo[message.photo.length - 1].file_id
+          const media = await getTelegramFileBase64(fileId)
+          mediaBase64 = media.base64
+          mimeType = media.mimeType
+        } catch (downloadErr: any) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `⚠️ Gagal mengunduh foto: ${downloadErr.message}` })
+        }
+      } else if (isVoice) {
+        try {
+          const fileId = message.voice.file_id
+          const media = await getTelegramFileBase64(fileId)
+          mediaBase64 = media.base64
+          mimeType = message.voice.mime_type || media.mimeType
+        } catch (downloadErr: any) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `⚠️ Gagal mengunduh Voice Note: ${downloadErr.message}` })
+        }
+      }
+
+      // Build System Context for Gemini
+      let systemContext = ''
+      
+      // Selalu fetch transaksi personal user (baik admin maupun bukan)
+      const { data: txs } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount, description, date')
+        .eq('user_id', profile.id)
+        .order('date', { ascending: false })
+        .limit(10)
+        
+      if (txs && txs.length > 0) {
+        systemContext += `Data Transaksi Pribadi Anda (10 terakhir):\n`
+        txs.forEach(t => {
+          systemContext += `- [${t.date}] ${t.type === 'income' ? 'Pemasukan' : 'Pengeluaran'} Rp${t.amount}: ${t.description}\n`
+        })
+        systemContext += `\nGunakan data di atas jika pengguna menanyakan riwayat/laporan pengeluarannya.\n`
+      }
+
+      const isAdmin = chatId.toString() === process.env.ADMIN_TELEGRAM_ID
+      
+      if (isAdmin) {
+        // Fetch admin stats
+        const { count: userCount } = await supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true })
+        const { data: revData } = await supabaseAdmin.from('subscriptions').select('price').eq('status', 'active')
+        const totalRev = revData?.reduce((s, row) => s + (row.price || 0), 0) || 0
+        
+        systemContext += `\nPeran Pengguna: ADMIN UTAMA APLIKASI.\n`
+        systemContext += `Data Aplikasi Saat Ini (Hanya untuk Admin):\n`
+        systemContext += `- Total User Terdaftar: ${userCount || 0}\n`
+        systemContext += `- Estimasi Pendapatan Langganan Aktif: Rp${totalRev.toLocaleString('id-ID')}\n`
+        systemContext += `\nAnda diizinkan untuk memberikan data admin jika diminta (intent: ask_admin_stats).`
+      } else {
+        systemContext += `\nPeran Pengguna: PENGGUNA BIASA (Nama: ${profile.full_name || 'Pengguna'}).\n`
+        systemContext += `\nJika pengguna bertanya metrik admin/pendapatan aplikasi, tolak dengan sopan karena mereka bukan admin.`
+      }
+
+      // Gunakan Gemini untuk mengurai percakapan dengan auto-retry
+      let aiResult;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          aiResult = await handleTelegramChatWithGemini(userPrompt, mediaBase64, mimeType, systemContext)
+          break;
+        } catch (err: any) {
+          retries--;
+          if (retries === 0) {
+            let errorMsg = err.message;
+            if (errorMsg.includes('503') || errorMsg.includes('UNAVAILABLE')) {
+              errorMsg = "Layanan AI sedang sibuk (High Demand). Silakan coba lagi dalam beberapa detik.";
+            } else if (errorMsg.includes('429') || errorMsg.includes('exceeded')) {
+              errorMsg = `Rate Limit tercapai dari total ${getKeysCount()} kunci aktif. Error Asli: ${err.message}`;
+            }
+            return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `⚠️ Maaf: ${errorMsg}` })
+          }
+          
+          // Jika 429, coba rotate key sebelum retry
+          if (err.message && (err.message.includes('429') || err.message.includes('exceeded'))) {
+            const rotated = rotateGeminiKey();
+            if (rotated) {
+              console.log("Mencoba ulang dengan API Key yang baru...");
+              continue; // Langsung retry tanpa delay karena pakai key baru
+            }
+          }
+          
+          // Tunggu 2 detik sebelum mencoba lagi
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      // Pastikan aiResult ada sebelum diproses lebih lanjut
+      if (!aiResult) {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `⚠️ Maaf, terjadi kesalahan saat memproses data AI.` })
+      }
+
+      // Routing Intent AI
+      if (aiResult.intent === 'record_transaction' && aiResult.transactions && aiResult.transactions.length > 0) {
+        // Insert semua transaksi ke database
+        for (const parsed of aiResult.transactions) {
+          await supabaseAdmin.from('transactions').insert({
+            user_id: profile.id,
+            type: parsed.type,
+            amount: parsed.amount,
+            description: parsed.description,
+            category_name: parsed.category,
+            date: new Date().toISOString().split('T')[0],
+            source: 'telegram',
+            ai_parsed: true
+          })
+        }
+
+        let replyText = aiResult.replyText + `\n\n✨ *Mencatat ${aiResult.transactions.length} Transaksi:*\n`
+        for (const parsed of aiResult.transactions) {
+          const typeText = parsed.type === 'income' ? '💚' : '❤️'
+          replyText += `${typeText} ${parsed.description}: Rp${parsed.amount.toLocaleString('id-ID')}\n`
+        }
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: replyText,
+          parse_mode: 'Markdown'
+        })
+      } else {
+        // Balasan biasa (laporan, pertanyaan admin, obrolan santai, atau kegagalan parsing)
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: aiResult.replyText || `Maaf, saya tidak mengerti maksud Anda. 🤔\nMedia: ${mediaBase64 ? 'Ada' : 'Tidak Ada'}`,
+          parse_mode: 'Markdown'
+        })
+      }
+    }
+
+    return NextResponse.json({ ok: true })
+
+  } catch (error: any) {
+    console.error('Telegram webhook error:', error)
+    // Laporkan ke Admin jika terjadi error sistem
+    if (chatId) {
+      await notifyAdmin(`Error saat memproses pesan dari user ${chatId}:\n${error.message}`)
+    }
+    return NextResponse.json({ ok: true })
+  }
+}
