@@ -131,13 +131,18 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-text-main">Target Keuangan</h2>
-          <p className="text-text-muted">Wujudkan impian Anda dengan perencanaan cerdas.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+            <Target className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Target Keuangan</h2>
+            <p className="text-sm text-text-muted mt-0.5">Wujudkan impian dengan perencanaan cerdas</p>
+          </div>
         </div>
-        <Button variant="gradient" className="shadow-md" onClick={() => setShowModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />Buat Target
+        <Button variant="gradient" size="sm" className="shadow-sm shrink-0" onClick={() => setShowModal(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />Buat Target
         </Button>
       </div>
 

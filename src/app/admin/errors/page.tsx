@@ -49,14 +49,19 @@ export default function ErrorCenterPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-text-main">Error Center</h2>
-          <p className="text-text-muted">Monitor integritas sistem dan log error dari berbagai layanan.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Error Center</h2>
+            <p className="text-sm text-text-muted mt-0.5">Monitor integritas sistem & log error</p>
+          </div>
         </div>
-        <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 bg-white" onClick={handleClearResolved}>
-          <AlertTriangle className="mr-2 h-4 w-4" />
-          Clear All Resolved
+        <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 bg-white" onClick={handleClearResolved}>
+          <CheckCircle className="mr-1.5 h-4 w-4" />
+          Bersihkan yang resolved
         </Button>
       </div>
 

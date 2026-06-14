@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MessageSquare, Send, Bell, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
+import { cn } from '@/lib/utils';
 
 export default function AdminBroadcastPage() {
   const [title, setTitle] = useState('');
@@ -42,9 +43,14 @@ export default function AdminBroadcastPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-text-main">Kirim Broadcast</h2>
-        <p className="text-text-muted">Kirim pengumuman massal ke seluruh user aplikasi melalui notifikasi in-app.</p>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+          <MessageSquare className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Kirim Broadcast</h2>
+          <p className="text-sm text-text-muted mt-0.5">Pengumuman massal ke seluruh user via in-app</p>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

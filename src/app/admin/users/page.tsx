@@ -1,11 +1,14 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Users as UsersIcon, Search, Loader2, Trash2, Key, Mail, Target, Bell, Calendar, X, Activity } from 'lucide-react';
+import { Users as UsersIcon, Search, Loader2, Trash2, Key, Mail, Target, Bell, Calendar, X, Activity, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { Skeleton, ListItemSkeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/PageHeader';
+import { cn } from '@/lib/utils';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -43,13 +46,53 @@ export default function AdminUsersPage() {
     u.telegram_id?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleDeleteUser = async (user: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const ok = await confirmDialog({
+      title: 'Hapus user permanen?',
+      message: `Semua data milik ${user.full_name || user.email} akan dihapus permanen dan tidak bisa dipulihkan.`,
+      confirmLabel: 'Ya, hapus',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const res = await fetch('/api/user/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      if (res.ok) {
+        setUsers(users.filter(u => u.id !== user.id));
+        toast.success('User berhasil dihapus.');
+      } else {
+        toast.error('Gagal menghapus user.');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan saat menghapus user.');
+    }
+  };
+
+  const planBadgeClass = (plan: string) => {
+    const p = plan?.toLowerCase() || '';
+    if (p === 'monthly' || p === 'yearly') return 'bg-green-100 text-green-700';
+    if (p === 'admin pro' || p === 'admin') return 'bg-amber-100 text-amber-700';
+    return 'bg-gray-100 text-gray-700';
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-text-main">Manajemen User</h2>
-        <p className="text-text-muted">Kelola semua pengguna terdaftar di aplikasi FinMate AI.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+            <UsersIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Manajemen User</h2>
+            <p className="text-sm text-text-muted mt-0.5">Kelola semua pengguna terdaftar</p>
+          </div>
+        </div>
       </div>
-      
+
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -68,99 +111,119 @@ export default function AdminUsersPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+            <div className="divide-y divide-border">
+              {[0, 1, 2, 3].map(i => <div key={i} className="px-4 sm:px-6 py-4"><ListItemSkeleton /></div>)}
             </div>
-          ) : filteredUsers.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 text-xs uppercase text-text-muted border-b border-border">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Avatar</th>
-                    <th className="px-6 py-4 font-medium">Nama Lengkap</th>
-                    <th className="px-6 py-4 font-medium">Email</th>
-                    <th className="px-6 py-4 font-medium">Telegram ID</th>
-                    <th className="px-6 py-4 font-medium">Tanggal Daftar</th>
-                    <th className="px-6 py-4 font-medium">Status Langganan</th>
-                    <th className="px-6 py-4 font-medium text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((user) => (
-                    <tr 
-                      key={user.id} 
-                      className="bg-white hover:bg-gray-50 cursor-pointer"
-                      onClick={() => setSelectedUser(user)}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold overflow-hidden">
-                          {user.avatar_url ? (
-                            <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
-                          ) : (
-                            user.full_name?.charAt(0) || 'U'
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-text-main">{user.full_name || 'Tidak ada nama'}</td>
-                      <td className="px-6 py-4 text-text-muted">{user.email}</td>
-                      <td className="px-6 py-4 text-text-muted">{user.telegram_id || '-'}</td>
-                      <td className="px-6 py-4 text-text-muted">
-                        {new Date(user.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
-                          user.plan?.toLowerCase() === 'monthly' || user.plan?.toLowerCase() === 'yearly' ? 'bg-green-100 text-green-700' : 
-                          user.plan === 'Admin Pro' ? 'bg-amber-100 text-amber-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {user.plan || 'Trial'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right flex justify-end gap-2">
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const ok = await confirmDialog({
-                              title: 'Hapus user permanen?',
-                              message: `Semua data milik ${user.full_name || user.email} akan dihapus permanen dan tidak bisa dipulihkan.`,
-                              confirmLabel: 'Ya, hapus',
-                              tone: 'danger',
-                            });
-                            if (!ok) return;
-                            try {
-                              const res = await fetch('/api/user/delete', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: user.id })
-                              });
-                              if (res.ok) {
-                                setUsers(users.filter(u => u.id !== user.id));
-                                toast.success('User berhasil dihapus.');
-                              } else {
-                                toast.error('Gagal menghapus user.');
-                              }
-                            } catch (e) {
-                              toast.error('Terjadi kesalahan saat menghapus user.');
-                            }
-                          }}
-                          className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Hapus Akun"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          ) : filteredUsers.length === 0 ? (
+            <EmptyState
+              icon={<UsersIcon className="h-7 w-7" />}
+              title={search ? 'Tidak ada hasil' : 'Belum ada pengguna'}
+              description={search ? 'Coba kata kunci lain.' : 'User yang mendaftar akan muncul di sini.'}
+            />
           ) : (
-            <div className="text-center py-16 text-text-muted">
-              <UsersIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">Tidak ada data pengguna ditemukan.</p>
-            </div>
+            <>
+              {/* DESKTOP TABLE */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-text-muted border-b border-border">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Pengguna</th>
+                      <th className="px-4 py-3 font-semibold">Telegram</th>
+                      <th className="px-4 py-3 font-semibold">Bergabung</th>
+                      <th className="px-4 py-3 font-semibold">Langganan</th>
+                      <th className="px-4 py-3 font-semibold text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredUsers.map((user) => (
+                      <tr
+                        key={user.id}
+                        className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => setSelectedUser(user)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center text-white font-bold overflow-hidden shadow-sm">
+                              {user.avatar_url ? (
+                                <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
+                              ) : (
+                                user.full_name?.charAt(0) || 'U'
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-text-main truncate">{user.full_name || 'Tanpa Nama'}</p>
+                              <p className="text-xs text-text-muted truncate">{user.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-text-muted text-xs">{user.telegram_id || '—'}</td>
+                        <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
+                          {new Date(user.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={cn("px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider", planBadgeClass(user.plan))}>
+                            {user.plan || 'Trial'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={(e) => handleDeleteUser(user, e)}
+                            className="text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Hapus Akun"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE CARDS */}
+              <div className="md:hidden divide-y divide-border">
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="px-4 py-3 active:bg-gray-50 cursor-pointer"
+                    onClick={() => setSelectedUser(user)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center text-white font-bold overflow-hidden shadow-sm">
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt="avatar" className="h-full w-full object-cover" />
+                        ) : (
+                          user.full_name?.charAt(0) || 'U'
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-semibold text-text-main truncate">{user.full_name || 'Tanpa Nama'}</p>
+                          <span className={cn("shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", planBadgeClass(user.plan))}>
+                            {user.plan || 'Trial'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-text-muted truncate mt-0.5">{user.email}</p>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <p className="text-[11px] text-text-muted">
+                            {new Date(user.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                          <button
+                            onClick={(e) => handleDeleteUser(user, e)}
+                            className="text-red-400 hover:text-red-600 active:bg-red-50 p-1.5 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-gray-300 shrink-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

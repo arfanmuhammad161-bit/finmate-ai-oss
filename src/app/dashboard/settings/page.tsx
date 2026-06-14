@@ -290,9 +290,14 @@ function SettingsContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-text-main">Pengaturan</h2>
-        <p className="text-text-muted">Kelola akun, langganan, dan preferensi Anda.</p>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+          <User className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Pengaturan</h2>
+          <p className="text-sm text-text-muted mt-0.5">Akun, langganan, & preferensi Anda</p>
+        </div>
       </div>
 
       {/* Trial Banner */}

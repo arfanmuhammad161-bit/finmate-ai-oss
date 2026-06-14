@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { TrendingUp, Loader2, DollarSign, Users, CreditCard } from 'lucide-react';
+import { Skeleton, StatsGridSkeleton } from '@/components/ui/Skeleton';
 
 export default function AdminRevenuePage() {
   const [data, setData] = useState<any>(null);
@@ -19,13 +20,21 @@ export default function AdminRevenuePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-text-main">Laporan Pendapatan</h2>
-        <p className="text-text-muted">Statistik pendapatan langganan aplikasi secara real-time.</p>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+          <TrendingUp className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Laporan Pendapatan</h2>
+          <p className="text-sm text-text-muted mt-0.5">Statistik pendapatan langganan real-time</p>
+        </div>
       </div>
-      
+
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary-500" /></div>
+        <div className="space-y-6">
+          <StatsGridSkeleton count={3} />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -76,13 +76,15 @@ export default function AIAssistantPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] flex flex-col">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-text-main flex items-center gap-2">
-          <Bot className="h-6 w-6 text-primary-600" />
-          AI Financial Assistant
-        </h2>
-        <p className="text-text-muted">Chat dengan asisten pintar Anda untuk mengatur keuangan.</p>
+    <div className="h-[calc(100vh-160px)] sm:h-[calc(100vh-180px)] flex flex-col">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+          <Bot className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">AI Assistant</h2>
+          <p className="text-sm text-text-muted mt-0.5">Chat dengan asisten keuangan pintar Anda</p>
+        </div>
       </div>
 
       <Card className="flex-1 flex flex-col border-border overflow-hidden bg-white/50 backdrop-blur-sm">

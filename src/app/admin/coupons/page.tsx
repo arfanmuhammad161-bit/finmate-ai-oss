@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Loader2, Trash2, Ticket, Copy, Share2, Tag, Layers, RefreshCw } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
@@ -131,23 +132,28 @@ export default function AdminCouponsPage() {
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/dashboard/settings?coupon=${code}` : '';
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-4 flex-1">
-          <span className="text-gray-500 font-medium">Bagikan URL:</span>
-          <div className="bg-gray-50 px-4 py-2 rounded-lg flex-1 text-gray-700 truncate font-mono text-sm border border-gray-100">
-            {code ? shareUrl : 'https://finmate.ai/promo/...'}
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+          <Ticket className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Kupon & Promo</h2>
+          <p className="text-sm text-text-muted mt-0.5">Buat & kelola kode promo untuk user</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 card-depth">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <span className="hidden sm:inline text-xs text-text-muted font-semibold uppercase tracking-wider shrink-0">URL Promo:</span>
+          <div className="bg-gray-50 px-3 py-2 rounded-lg flex-1 text-text-muted truncate font-mono text-xs border border-gray-100">
+            {code ? shareUrl : 'Buat kupon dulu untuk dapat URL...'}
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-4">
-          <Button variant="outline" className="text-primary-600 border-primary-200 hover:bg-primary-50" onClick={() => handleCopy(shareUrl)} disabled={!code}>
-            <Share2 className="h-4 w-4 mr-2" />
-            Membagikan
-          </Button>
-          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white border-0">
-            Sesuaikan URL
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" className="text-primary-600 border-primary-200 hover:bg-primary-50 shrink-0" onClick={() => handleCopy(shareUrl)} disabled={!code}>
+          <Share2 className="h-3.5 w-3.5 mr-1.5" />
+          Salin URL
+        </Button>
       </div>
 
       <form onSubmit={handleCreateCoupon} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
