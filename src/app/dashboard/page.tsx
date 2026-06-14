@@ -4,10 +4,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { 
+import {
   ArrowUpRight, ArrowDownRight, Wallet, Landmark, Bot, Sparkles,
   TrendingUp, Clock, Crown, Loader2, Plus
 } from 'lucide-react';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -95,11 +96,7 @@ export default function DashboardPage() {
   useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const formatRupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;

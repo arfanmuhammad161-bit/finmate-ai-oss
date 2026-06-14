@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Plus, Target, Sparkles, TrendingUp, X } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
+import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 
 interface Goal {
   id: string;
@@ -112,7 +113,17 @@ export default function GoalsPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div className="space-y-2"><Skeleton className="h-7 w-40" /><Skeleton className="h-3.5 w-56" /></div>
+          <Skeleton className="h-10 w-32 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[0, 1].map(i => <CardSkeleton key={i} className="h-64" />)}
+        </div>
+      </div>
+    );
   }
 
   const formatRupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;

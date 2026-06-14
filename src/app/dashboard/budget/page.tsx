@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2, Plus, AlertTriangle, X } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
+import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 
 interface Budget {
   id: string;
@@ -138,7 +139,17 @@ export default function BudgetPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div className="space-y-2"><Skeleton className="h-7 w-40" /><Skeleton className="h-3.5 w-72" /></div>
+          <Skeleton className="h-10 w-36 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      </div>
+    );
   }
 
   const warningBudgets = budgets.filter(b => {
