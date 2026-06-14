@@ -11,6 +11,8 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/PageHeader';
+import { Receipt } from 'lucide-react';
 
 const categoryList = [
   "Makanan", "Transportasi", "Hiburan", "Belanja", "Tagihan", "Kesehatan", "Pendidikan", "Lainnya",
@@ -196,12 +198,16 @@ function TransactionsContent() {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-16 text-text-muted">
-              <p className="font-medium">Belum ada transaksi.</p>
-              <Button variant="gradient" size="sm" className="mt-4" onClick={() => setShowModal(true)}>
-                <Plus className="mr-2 h-4 w-4" />Tambah Transaksi Pertama
-              </Button>
-            </div>
+            <EmptyState
+              icon={<Receipt className="h-7 w-7" />}
+              title={search || filter !== 'all' ? 'Tidak ada hasil' : 'Belum ada transaksi'}
+              description={search || filter !== 'all' ? 'Coba ubah kata kunci atau filter.' : 'Mulai catat aktivitas keuangan Anda di sini.'}
+              action={(!search && filter === 'all') && (
+                <Button variant="gradient" onClick={() => setShowModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />Catat transaksi pertama
+                </Button>
+              )}
+            />
           ) : (
             <div className="overflow-x-auto">
               {/* DESKTOP VIEW (Table) */}

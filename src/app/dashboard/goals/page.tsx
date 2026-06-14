@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2, Plus, Target, Sparkles, TrendingUp, X } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/PageHeader';
 
 interface Goal {
   id: string;
@@ -142,15 +143,17 @@ export default function GoalsPage() {
 
       {goals.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-20 text-text-muted gap-4">
-            <Target className="h-16 w-16 text-gray-200" />
-            <div className="text-center">
-              <p className="text-lg font-semibold text-text-main">Belum ada target keuangan</p>
-              <p className="text-sm">Buat target pertama Anda untuk mulai menabung secara terarah.</p>
-            </div>
-            <Button variant="gradient" onClick={() => setShowModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />Buat Target Sekarang
-            </Button>
+          <CardContent>
+            <EmptyState
+              icon={<Target className="h-7 w-7" />}
+              title="Belum ada target keuangan"
+              description="Buat target untuk mewujudkan impian — beli laptop, dana darurat, atau liburan."
+              action={
+                <Button variant="gradient" onClick={() => setShowModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />Buat target pertama
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

@@ -10,6 +10,8 @@ import { Loader2, Plus, AlertTriangle, X } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
 import { confirmDialog } from '@/components/ui/ConfirmDialog';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/PageHeader';
+import { PieChart } from 'lucide-react';
 
 interface Budget {
   id: string;
@@ -192,15 +194,17 @@ export default function BudgetPage() {
 
       {budgets.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-text-muted gap-4">
-            <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center text-3xl">💰</div>
-            <div className="text-center">
-              <p className="text-lg font-semibold text-text-main">Belum ada budget bulan ini</p>
-              <p className="text-sm">Buat budget per kategori untuk kontrol pengeluaran Anda.</p>
-            </div>
-            <Button variant="gradient" onClick={() => setShowModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />Buat Budget Pertama
-            </Button>
+          <CardContent>
+            <EmptyState
+              icon={<PieChart className="h-7 w-7" />}
+              title="Belum ada anggaran bulan ini"
+              description="Buat anggaran per kategori untuk kendalikan pengeluaran Anda."
+              action={
+                <Button variant="gradient" onClick={() => setShowModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />Buat anggaran pertama
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : (

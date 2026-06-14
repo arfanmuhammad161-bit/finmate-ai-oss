@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Users, UserPlus, CreditCard, TrendingUp, DollarSign, Download, Loader2 } from 'lucide-react';
+import { Users, UserPlus, CreditCard, TrendingUp, DollarSign, Download, Loader2, LayoutDashboard } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from '@/components/ui/Toast';
+import { Skeleton, CardSkeleton, StatsGridSkeleton } from '@/components/ui/Skeleton';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -36,7 +37,16 @@ export default function AdminDashboardPage() {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div className="space-y-2"><Skeleton className="h-7 w-44" /><Skeleton className="h-3.5 w-72" /></div>
+          <Skeleton className="h-10 w-32 rounded-xl" />
+        </div>
+        <StatsGridSkeleton count={4} />
+        <CardSkeleton className="h-72" />
+      </div>
+    );
   }
 
   const formatRupiah = (n: number) => `Rp${(n || 0).toLocaleString('id-ID')}`;
@@ -65,87 +75,53 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-text-main">Admin Overview</h2>
-          <p className="text-text-muted">Pantau pertumbuhan dan metrik utama aplikasi FinMate.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm">
+            <LayoutDashboard className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Admin Overview</h2>
+            <p className="text-sm text-text-muted mt-0.5">Pantau pertumbuhan & metrik utama aplikasi</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="bg-white border-primary-200 text-primary-700 hover:bg-primary-50 shadow-sm hidden sm:flex" onClick={() => router.push('/dashboard')}>
-            Kembali ke User Dashboard
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="bg-white" onClick={() => router.push('/dashboard')}>
+            <span className="hidden sm:inline">Kembali ke </span>User
           </Button>
-          <Button variant="outline" className="bg-white shadow-sm" onClick={handleExportData}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Data
+          <Button variant="outline" size="sm" className="bg-white" onClick={handleExportData}>
+            <Download className="mr-1.5 h-4 w-4" />
+            Export
           </Button>
         </div>
-        {/* Mobile only back button for easier reach */}
-        <Button variant="outline" className="bg-white border-primary-200 text-primary-700 hover:bg-primary-50 shadow-sm w-full sm:hidden" onClick={() => router.push('/dashboard')}>
-          Kembali ke User Dashboard
-        </Button>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-muted text-sm">Total User</h3>
-              <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Users className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-text-main">{metrics?.totalUsers || 0}</div>
-            <p className="text-xs text-green-600 flex items-center mt-2">
-              Live dari Supabase Auth
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-muted text-sm">User Trial Aktif</h3>
-              <div className="h-8 w-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
-                <UserPlus className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-text-main">{metrics?.activeTrials || 0}</div>
-            <p className="text-xs text-green-600 flex items-center mt-2">
-              User biasa (Selain Admin)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-muted text-sm">User Pro (Admin)</h3>
-              <div className="h-8 w-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-                <CreditCard className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-text-main">{metrics?.proUsers || 1}</div>
-            <p className="text-xs text-green-600 flex items-center mt-2">
-              Akses Penuh Selamanya
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-text-muted text-sm">Volume Transaksi</h3>
-              <div className="h-8 w-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                <DollarSign className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-text-main">{formatRupiah(metrics?.totalVolume || 0)}</div>
-            <p className="text-xs text-green-600 flex items-center mt-2">
-              Aktivitas finansial platform
-            </p>
-          </CardContent>
-        </Card>
+      {/* Metric Cards — compact */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {[
+          { label: 'Total User', value: metrics?.totalUsers || 0, icon: Users, bg: 'bg-blue-50', tx: 'text-blue-600', sub: 'Dari Supabase Auth' },
+          { label: 'User Trial', value: metrics?.activeTrials || 0, icon: UserPlus, bg: 'bg-orange-50', tx: 'text-orange-600', sub: 'Selain admin' },
+          { label: 'User Pro', value: metrics?.proUsers || 1, icon: CreditCard, bg: 'bg-purple-50', tx: 'text-purple-600', sub: 'Akses penuh' },
+          { label: 'Volume Tx', value: formatRupiah(metrics?.totalVolume || 0), icon: DollarSign, bg: 'bg-green-50', tx: 'text-green-600', sub: 'Total aktivitas' },
+        ].map((m, i) => {
+          const Icon = m.icon;
+          return (
+            <Card key={i} className="overflow-hidden">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", m.bg, m.tx)}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-medium text-text-muted">{m.label}</span>
+                </div>
+                <div className="text-lg sm:text-2xl font-bold text-text-main tabular-nums truncate">
+                  {m.value}
+                </div>
+                <p className="text-[10px] sm:text-xs text-text-muted mt-1 truncate">{m.sub}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

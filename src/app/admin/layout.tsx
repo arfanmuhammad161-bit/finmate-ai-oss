@@ -47,7 +47,7 @@ export default function AdminLayout({
           onMenuClick={() => setIsSidebarOpen(true)}
           onDesktopMenuClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
-        <main className="flex-1 overflow-y-auto p-6 scroll-smooth bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">
           <div className="max-w-6xl mx-auto">
             {children}
           </div>

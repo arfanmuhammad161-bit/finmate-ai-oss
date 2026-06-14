@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import {
-  ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, Bot, Sparkles,
+  ArrowUpRight, ArrowDownRight, Wallet, Coins, Bot, Sparkles,
   TrendingUp, TrendingDown, Clock, Crown, Plus, FileText, Receipt, ChevronRight, Eye, EyeOff
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -153,19 +153,19 @@ export default function DashboardPage() {
 
       {/* HERO BALANCE CARD */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-600 text-white shadow-xl">
-        {/* Decorative blobs */}
-        <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-secondary-400/30 blur-2xl" />
 
-        <div className="relative p-6 sm:p-7">
-          <div className="flex items-start justify-between">
+        <div className="relative grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 p-5 sm:p-6">
+          {/* LEFT: balance info */}
+          <div className="flex flex-col justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-primary-100 text-sm font-medium">
                 <Wallet className="h-4 w-4" />
                 Saldo bulan ini
               </div>
-              <div className="mt-3 flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">
+              <div className="mt-2 flex items-baseline gap-2.5 flex-wrap">
+                <span className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight tabular-nums">
                   {balanceDisplay}
                 </span>
                 <button
@@ -187,115 +187,137 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {aiScore !== null && (
-              <div className="hidden sm:flex flex-col items-end gap-1">
-                <div className="flex items-center gap-1.5 text-primary-100 text-xs font-medium">
-                  <Sparkles className="h-3 w-3" />AI Score
+            {/* In/Out micro-summary inside hero */}
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/15">
+              <div>
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary-100/80 font-semibold">
+                  <ArrowDownRight className="h-3 w-3" />Masuk
                 </div>
-                <div className="text-2xl font-bold tabular-nums">{aiScore}<span className="text-sm text-primary-200">/100</span></div>
+                <div className="text-base sm:text-lg font-bold tabular-nums mt-0.5">
+                  {hideBalance ? '••••' : formatRupiah(stats?.income || 0)}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary-100/80 font-semibold">
+                  <ArrowUpRight className="h-3 w-3" />Keluar
+                </div>
+                <div className="text-base sm:text-lg font-bold tabular-nums mt-0.5">
+                  {hideBalance ? '••••' : formatRupiah(stats?.expense || 0)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: AI Score + sparkline */}
+          <div className="hidden lg:flex flex-col justify-between gap-4 pl-5 border-l border-white/15">
+            <div>
+              <div className="flex items-center gap-1.5 text-primary-100 text-sm font-medium">
+                <Sparkles className="h-4 w-4" />AI Financial Score
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-4xl font-bold tabular-nums">{aiScore ?? '--'}</span>
+                <span className="text-base text-primary-200">/100</span>
+              </div>
+              <p className="text-xs text-primary-100 mt-1.5 leading-relaxed">
+                {aiScore !== null
+                  ? aiScore >= 70 ? 'Skor sehat, pertahankan!' : aiScore >= 50 ? 'Cukup baik, masih bisa ditingkatkan.' : 'Perlu evaluasi pengeluaran.'
+                  : 'Catat transaksi untuk dapat skor.'}
+              </p>
+            </div>
+            {chartData.length > 0 && chartData.some(d => d.in > 0 || d.out > 0) && (
+              <div className="h-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="heroSpark" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ffffff" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey="in" stroke="rgba(255,255,255,0.95)" strokeWidth={2} fill="url(#heroSpark)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
-
-          {/* Sparkline-ish mini chart */}
-          {chartData.length > 0 && chartData.some(d => d.in > 0 || d.out > 0) && (
-            <div className="mt-5 h-16 -mx-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="heroSpark" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ffffff" stopOpacity={0.6} />
-                      <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area
-                    type="monotone"
-                    dataKey="in"
-                    stroke="rgba(255,255,255,0.9)"
-                    strokeWidth={2}
-                    fill="url(#heroSpark)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* QUICK ACTIONS */}
+      {/* QUICK ACTIONS — di mobile vertikal tinggi, di laptop horizontal compact */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        <Link href="/dashboard/transactions" className="group">
-          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-primary-300 hover:-translate-y-0.5 active:scale-95">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100">
-              <Plus className="h-5 w-5" />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Catat Transaksi</span>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/ai-assistant" className="group">
-          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-secondary-300 hover:-translate-y-0.5 active:scale-95">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-secondary-50 text-secondary-600 flex items-center justify-center group-hover:bg-secondary-100">
-              <Bot className="h-5 w-5" />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Tanya AI</span>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/reports" className="group">
-          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-accent-300 hover:-translate-y-0.5 active:scale-95">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-accent-50 text-accent-600 flex items-center justify-center group-hover:bg-accent-100">
-              <FileText className="h-5 w-5" />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Laporan</span>
-          </div>
-        </Link>
+        {[
+          { href: "/dashboard/transactions", icon: Plus, label: "Catat Transaksi", iconBg: "bg-primary-50 text-primary-600", hoverBorder: "hover:border-primary-300" },
+          { href: "/dashboard/ai-assistant", icon: Bot, label: "Tanya AI", iconBg: "bg-secondary-50 text-secondary-600", hoverBorder: "hover:border-secondary-300" },
+          { href: "/dashboard/reports", icon: FileText, label: "Laporan", iconBg: "bg-accent-50 text-accent-600", hoverBorder: "hover:border-accent-300" },
+        ].map((qa) => {
+          const Icon = qa.icon;
+          return (
+            <Link key={qa.href} href={qa.href} className="group">
+              <div className={cn(
+                "bg-white border border-border rounded-2xl card-depth p-3 lg:p-3 flex flex-col sm:flex-row items-center sm:justify-start gap-2 sm:gap-3 transition-all hover:-translate-y-0.5 active:scale-[0.98]",
+                qa.hoverBorder
+              )}>
+                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center shrink-0", qa.iconBg)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-xs sm:text-sm font-semibold text-text-main text-center sm:text-left leading-tight">
+                  {qa.label}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* STATS GRID — 2 col mobile, 3 col tablet+ */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      {/* STATS GRID — Tabungan + AI Score (di mobile saja, di laptop AI score sudah ada di hero) */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Card className="overflow-hidden">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
-                <ArrowDownRight className="h-4 w-4" />
-              </div>
-              <span className="text-xs font-medium text-text-muted">Pemasukan</span>
-            </div>
-            <div className="text-lg sm:text-xl font-bold text-green-600 tabular-nums truncate">
-              {hideBalance ? '••••' : formatRupiah(stats?.income || 0)}
-            </div>
-            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Bulan ini</p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-                <ArrowUpRight className="h-4 w-4" />
-              </div>
-              <span className="text-xs font-medium text-text-muted">Pengeluaran</span>
-            </div>
-            <div className="text-lg sm:text-xl font-bold text-red-600 tabular-nums truncate">
-              {hideBalance ? '••••' : formatRupiah(stats?.expense || 0)}
-            </div>
-            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Bulan ini</p>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden col-span-2 lg:col-span-1">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-8 w-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
-                <PiggyBank className="h-4 w-4" />
+                <Coins className="h-4 w-4" />
               </div>
               <span className="text-xs font-medium text-text-muted">Tabungan bersih</span>
             </div>
             <div className="text-lg sm:text-xl font-bold text-purple-600 tabular-nums truncate">
               {hideBalance ? '••••' : formatRupiah(stats?.savings || 0)}
             </div>
-            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Selisih pemasukan & pengeluaran</p>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Pemasukan − pengeluaran</p>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden lg:hidden">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-medium text-text-muted">AI Score</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-primary-600 tabular-nums">
+              {aiScore ?? '--'}<span className="text-sm text-text-muted">/100</span>
+            </div>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">
+              {aiScore !== null ? (aiScore >= 70 ? 'Sehat' : aiScore >= 50 ? 'Cukup baik' : 'Perlu evaluasi') : 'Belum tersedia'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Hari ini stat card — diisi di laptop saat AI Score sudah ada di hero */}
+        <Card className="overflow-hidden hidden lg:block">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                <Receipt className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-medium text-text-muted">Aktivitas bulan ini</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-amber-700 tabular-nums">
+              {transactions.length}<span className="text-sm text-text-muted ml-1">transaksi</span>
+            </div>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">
+              {transactions.length === 0 ? 'Belum ada catatan' : 'Terus dicatat ya!'}
+            </p>
           </CardContent>
         </Card>
       </div>
