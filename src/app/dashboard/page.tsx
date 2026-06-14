@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import {
-  ArrowUpRight, ArrowDownRight, Wallet, Landmark, Bot, Sparkles,
-  TrendingUp, Clock, Crown, Loader2, Plus
+  ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, Bot, Sparkles,
+  TrendingUp, TrendingDown, Clock, Crown, Plus, FileText, Receipt, ChevronRight, Eye, EyeOff
 } from 'lucide-react';
-import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 
 interface Transaction {
   id: string;
@@ -32,24 +32,46 @@ interface DashboardStats {
   userName: string;
 }
 
+function getGreeting(): { greeting: string; emoji: string } {
+  const hour = new Date().getHours();
+  if (hour < 11) return { greeting: 'Selamat pagi', emoji: '☀️' };
+  if (hour < 15) return { greeting: 'Selamat siang', emoji: '🌤️' };
+  if (hour < 18) return { greeting: 'Selamat sore', emoji: '🌇' };
+  return { greeting: 'Selamat malam', emoji: '🌙' };
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function formatRupiah(n: number): string {
+  return `Rp${n.toLocaleString('id-ID')}`;
+}
+
+function formatCompact(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}jt`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}rb`;
+  return n.toString();
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hideBalance, setHideBalance] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get profile & subscription
     const [{ data: profile }, { data: sub }] = await Promise.all([
       supabase.from('profiles').select('full_name, trial_ends_at').eq('id', user.id).single(),
       supabase.from('subscriptions').select('plan, expires_at').eq('user_id', user.id).eq('status', 'active').single()
     ]);
 
-    // Get transactions for current month
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const { data: txs } = await supabase
@@ -63,7 +85,6 @@ export default function DashboardPage() {
     const income = allTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expense = allTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
-    // Build cashflow chart data (last 7 days)
     const last7 = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -95,111 +116,240 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
+  if (loading) return <DashboardSkeleton />;
 
-  const formatRupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
+  const { greeting, emoji } = getGreeting();
+  const aiScore = stats && stats.income > 0
+    ? Math.min(100, Math.round((stats.savings / stats.income) * 100 + 50))
+    : null;
+  const balanceDisplay = hideBalance ? '••••••••' : formatRupiah(stats?.balance || 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 md:space-y-6">
       {/* Trial Banner */}
       {stats && stats.trialDaysLeft > 0 && stats.trialDaysLeft <= 14 && (
-        <div className="flex items-center justify-between bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl px-5 py-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 shrink-0" />
-            <span className="text-sm font-medium">
-              Free Trial: <strong>{stats.trialDaysLeft} hari</strong> tersisa. Upgrade sekarang untuk tetap mengakses semua fitur AI.
+        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-2xl px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Clock className="h-4 w-4 shrink-0" />
+            <span className="text-xs sm:text-sm font-medium truncate">
+              Trial tinggal <strong>{stats.trialDaysLeft} hari</strong> lagi
             </span>
           </div>
-          <Link href="/dashboard/settings">
-            <Button size="sm" className="bg-white text-orange-600 hover:bg-orange-50 font-bold shrink-0 border-0">
-              <Crown className="mr-1.5 h-3 w-3" />Upgrade
+          <Link href="/dashboard/settings?tab=subscription" className="shrink-0">
+            <Button size="sm" className="bg-white text-orange-600 hover:bg-orange-50 font-bold border-0 h-8">
+              <Crown className="mr-1 h-3 w-3" />Upgrade
             </Button>
           </Link>
         </div>
       )}
 
       {/* Greeting */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-text-main">Halo, {stats?.userName} 👋</h2>
-          <p className="text-text-muted">Ini ringkasan keuangan Anda bulan ini.</p>
+      <div>
+        <p className="text-sm text-text-muted">{formatDate(new Date())}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-text-main mt-0.5">
+          {greeting}, {stats?.userName} {emoji}
+        </h2>
+      </div>
+
+      {/* HERO BALANCE CARD */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-600 text-white shadow-xl">
+        {/* Decorative blobs */}
+        <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-secondary-400/30 blur-2xl" />
+
+        <div className="relative p-6 sm:p-7">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-primary-100 text-sm font-medium">
+                <Wallet className="h-4 w-4" />
+                Saldo bulan ini
+              </div>
+              <div className="mt-3 flex items-baseline gap-3 flex-wrap">
+                <span className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">
+                  {balanceDisplay}
+                </span>
+                <button
+                  onClick={() => setHideBalance(!hideBalance)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                  aria-label="Sembunyikan saldo"
+                >
+                  {hideBalance ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
+              </div>
+              {stats && (stats.income > 0 || stats.expense > 0) && (
+                <div className="mt-3 inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-medium">
+                  {stats.balance >= 0 ? (
+                    <><TrendingUp className="h-3 w-3" /> Surplus bulan ini</>
+                  ) : (
+                    <><TrendingDown className="h-3 w-3" /> Defisit bulan ini</>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {aiScore !== null && (
+              <div className="hidden sm:flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5 text-primary-100 text-xs font-medium">
+                  <Sparkles className="h-3 w-3" />AI Score
+                </div>
+                <div className="text-2xl font-bold tabular-nums">{aiScore}<span className="text-sm text-primary-200">/100</span></div>
+              </div>
+            )}
+          </div>
+
+          {/* Sparkline-ish mini chart */}
+          {chartData.length > 0 && chartData.some(d => d.in > 0 || d.out > 0) && (
+            <div className="mt-5 h-16 -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="heroSpark" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ffffff" stopOpacity={0.6} />
+                      <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area
+                    type="monotone"
+                    dataKey="in"
+                    stroke="rgba(255,255,255,0.9)"
+                    strokeWidth={2}
+                    fill="url(#heroSpark)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
-        <Link href="/dashboard/ai-assistant">
-          <Button variant="gradient" className="shadow-lg">
-            <Bot className="mr-2 h-4 w-4" />Tanya AI Assistant
-          </Button>
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        <Link href="/dashboard/transactions" className="group">
+          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-primary-300 hover:-translate-y-0.5 active:scale-95">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100">
+              <Plus className="h-5 w-5" />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Catat Transaksi</span>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/ai-assistant" className="group">
+          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-secondary-300 hover:-translate-y-0.5 active:scale-95">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-secondary-50 text-secondary-600 flex items-center justify-center group-hover:bg-secondary-100">
+              <Bot className="h-5 w-5" />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Tanya AI</span>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/reports" className="group">
+          <div className="bg-white border border-border rounded-2xl card-depth p-3 sm:p-4 flex flex-col items-center gap-2 transition-all hover:border-accent-300 hover:-translate-y-0.5 active:scale-95">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-accent-50 text-accent-600 flex items-center justify-center group-hover:bg-accent-100">
+              <FileText className="h-5 w-5" />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-text-main text-center leading-tight">Laporan</span>
+          </div>
         </Link>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { title: 'Saldo Saat Ini', value: formatRupiah(stats?.balance || 0), icon: Wallet, color: 'bg-blue-50 text-blue-600', change: null },
-          { title: 'Total Pemasukan', value: formatRupiah(stats?.income || 0), icon: ArrowDownRight, color: 'bg-green-50 text-green-600', change: null },
-          { title: 'Total Pengeluaran', value: formatRupiah(stats?.expense || 0), icon: ArrowUpRight, color: 'bg-red-50 text-red-600', change: null },
-          { title: 'Tabungan', value: formatRupiah(stats?.savings || 0), icon: Landmark, color: 'bg-purple-50 text-purple-600', change: null },
-        ].map((c, i) => (
-          <Card key={i}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-medium text-text-muted text-sm">{c.title}</h3>
-                <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", c.color)}>
-                  <c.icon className="h-4 w-4" />
-                </div>
+      {/* STATS GRID — 2 col mobile, 3 col tablet+ */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <Card className="overflow-hidden">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                <ArrowDownRight className="h-4 w-4" />
               </div>
-              <div className="text-2xl font-bold text-text-main">{c.value}</div>
-              <p className="text-xs text-text-muted mt-2">Bulan ini</p>
-            </CardContent>
-          </Card>
-        ))}
+              <span className="text-xs font-medium text-text-muted">Pemasukan</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-green-600 tabular-nums truncate">
+              {hideBalance ? '••••' : formatRupiah(stats?.income || 0)}
+            </div>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Bulan ini</p>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                <ArrowUpRight className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-medium text-text-muted">Pengeluaran</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-red-600 tabular-nums truncate">
+              {hideBalance ? '••••' : formatRupiah(stats?.expense || 0)}
+            </div>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Bulan ini</p>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden col-span-2 lg:col-span-1">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                <PiggyBank className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-medium text-text-muted">Tabungan bersih</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-purple-600 tabular-nums truncate">
+              {hideBalance ? '••••' : formatRupiah(stats?.savings || 0)}
+            </div>
+            <p className="text-[10px] sm:text-xs text-text-muted mt-1">Selisih pemasukan & pengeluaran</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Cashflow Chart */}
+      {/* CHART + INSIGHT */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Cashflow 7 Hari Terakhir</CardTitle>
-            <CardDescription>Perbandingan pemasukan dan pengeluaran</CardDescription>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Arus 7 hari terakhir</CardTitle>
+                <CardDescription className="text-xs">Tren pemasukan vs pengeluaran harian</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {transactions.length === 0 ? (
-              <div className="h-56 md:h-[300px] flex flex-col items-center justify-center text-text-muted gap-4">
-                <TrendingUp className="h-12 w-12 text-gray-300" />
+              <div className="h-48 md:h-[280px] flex flex-col items-center justify-center text-text-muted gap-3">
+                <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center">
+                  <TrendingUp className="h-7 w-7 text-gray-400" />
+                </div>
                 <div className="text-center">
-                  <p className="font-medium">Belum ada transaksi</p>
-                  <p className="text-sm">Mulai catat transaksi pertama Anda!</p>
+                  <p className="font-semibold text-text-main">Grafik akan muncul di sini</p>
+                  <p className="text-sm mt-0.5">Catat transaksi pertama untuk melihat tren keuangan</p>
                 </div>
                 <Link href="/dashboard/transactions">
-                  <Button variant="gradient" size="sm">
-                    <Plus className="mr-2 h-4 w-4" />Tambah Transaksi
+                  <Button variant="gradient" size="sm" className="mt-1">
+                    <Plus className="mr-1.5 h-4 w-4" />Mulai catat
                   </Button>
                 </Link>
               </div>
             ) : (
-              <div className="h-56 md:h-[300px] w-full">
+              <div className="h-48 md:h-[280px] w-full -ml-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} />
-                    <Tooltip 
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => formatCompact(v)} width={42} />
+                    <Tooltip
                       formatter={(value: any) => [`Rp ${Number(value).toLocaleString('id-ID')}`, '']}
-                      contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}}
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px -2px rgba(0,0,0,0.12)' }}
                     />
-                    <Area type="linear" dataKey="in" name="Pemasukan" stroke="#22c55e" fillOpacity={1} fill="url(#colorIn)" strokeWidth={2} />
-                    <Area type="linear" dataKey="out" name="Pengeluaran" stroke="#ef4444" fillOpacity={1} fill="url(#colorOut)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="in" name="Pemasukan" stroke="#22c55e" fillOpacity={1} fill="url(#colorIn)" strokeWidth={2.5} />
+                    <Area type="monotone" dataKey="out" name="Pengeluaran" stroke="#ef4444" fillOpacity={1} fill="url(#colorOut)" strokeWidth={2.5} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -207,98 +357,87 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* AI Score & Insight */}
-        <div className="space-y-6">
-          <Card className="bg-gradient-to-br from-primary-600 to-secondary-600 text-white border-none shadow-lg">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-primary-100 flex items-center">
-                <Sparkles className="h-4 w-4 mr-2" />AI Financial Score
-              </h3>
-              <div className="mt-4 flex items-end gap-2">
-                <span className="text-5xl font-bold">
-                  {stats && stats.income > 0
-                    ? Math.min(100, Math.round((stats.savings / stats.income) * 100 + 50))
-                    : '--'}
-                </span>
-                <span className="text-xl text-primary-200 mb-1">/100</span>
+        {/* AI Insight */}
+        <Card className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border-orange-200">
+          <CardContent className="p-5 sm:p-6 h-full flex flex-col">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-sm">
+                <Sparkles className="h-4 w-4" />
               </div>
-              <p className="mt-4 text-sm text-primary-50 leading-relaxed">
-                {stats && stats.income > 0
-                  ? stats.savings > 0 
-                    ? `Bagus! Anda berhasil menghemat ${formatRupiah(stats.savings)} bulan ini.`
-                    : 'Pengeluaran melebihi pemasukan bulan ini. Yuk evaluasi!'
-                  : 'Belum ada transaksi bulan ini. Mulai catat sekarang!'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-orange-200 bg-orange-50/50">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 p-2 bg-orange-100 rounded-lg text-orange-600">
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-orange-900">AI Insight</h3>
-                  <p className="text-sm text-orange-800 mt-1 leading-relaxed">
-                    {transactions.length > 0
-                      ? `Anda sudah mencatat ${transactions.length} transaksi bulan ini. Terus pertahankan kebiasaan ini!`
-                      : 'Mulai catat transaksi Anda untuk mendapatkan insight keuangan dari AI.'}
-                  </p>
-                  <Link href="/dashboard/ai-assistant">
-                    <Button variant="link" className="px-0 h-auto text-orange-700 font-semibold mt-2">
-                      Tanya AI Assistant →
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <h3 className="font-bold text-orange-900">Insight AI</h3>
+            </div>
+            <p className="text-sm text-orange-900/80 leading-relaxed flex-1">
+              {stats && stats.income > 0
+                ? stats.savings > 0
+                  ? `Mantap! Bulan ini Anda berhasil menghemat ${formatRupiah(stats.savings)}. Pertahankan kebiasaan ini untuk masa depan yang lebih tenang. 🌱`
+                  : 'Pengeluaran melebihi pemasukan bulan ini. Yuk cek kategori mana yang paling besar dan evaluasi bersama AI Assistant.'
+                : 'Belum ada catatan keuangan bulan ini. Mulai dari yang kecil — bahkan secangkir kopi pagi pun penting untuk dicatat. ☕'}
+            </p>
+            <Link href="/dashboard/ai-assistant" className="mt-4">
+              <Button variant="link" className="px-0 h-auto text-orange-700 font-semibold">
+                Diskusi dengan AI <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Recent Transactions */}
+      {/* RECENT TRANSACTIONS */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div>
-            <CardTitle>Transaksi Terakhir</CardTitle>
-            <CardDescription>Aktivitas keuangan Anda terbaru</CardDescription>
+            <CardTitle className="text-base sm:text-lg">Aktivitas Terakhir</CardTitle>
+            <CardDescription className="text-xs">5 transaksi terbaru Anda</CardDescription>
           </div>
           <Link href="/dashboard/transactions">
-            <Button variant="outline" size="sm">Lihat Semua</Button>
+            <Button variant="ghost" size="sm" className="text-text-muted hover:text-primary-600">
+              Semua <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+            </Button>
           </Link>
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
-            <div className="text-center py-8 text-text-muted">
-              <Wallet className="h-12 w-12 text-gray-200 mx-auto mb-3" />
-              <p>Belum ada transaksi.</p>
+            <div className="text-center py-10 text-text-muted">
+              <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                <Receipt className="h-7 w-7 text-gray-400" />
+              </div>
+              <p className="font-semibold text-text-main">Belum ada aktivitas</p>
+              <p className="text-sm mt-1">Aktivitas keuangan Anda akan muncul di sini</p>
               <Link href="/dashboard/transactions">
-                <Button variant="gradient" size="sm" className="mt-3">
-                  <Plus className="mr-2 h-4 w-4" />Tambah Transaksi Pertama
+                <Button variant="gradient" size="sm" className="mt-4">
+                  <Plus className="mr-1.5 h-4 w-4" />Catat yang pertama
                 </Button>
               </Link>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-100">
               {transactions.map((trx) => (
-                <div key={trx.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                  <div className="flex items-center gap-4">
+                <Link
+                  key={trx.id}
+                  href="/dashboard/transactions"
+                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 active:bg-gray-50 -mx-2 px-2 rounded-xl transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold",
-                      trx.type === 'income' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold",
+                      trx.type === 'income'
+                        ? "bg-green-50 text-green-600 border border-green-100"
+                        : "bg-red-50 text-red-600 border border-red-100"
                     )}>
-                      {trx.category_name?.charAt(0) || (trx.type === 'income' ? '↓' : '↑')}
+                      {trx.type === 'income' ? <ArrowDownRight className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                     </div>
-                    <div>
-                      <p className="font-semibold text-text-main">{trx.description}</p>
-                      <p className="text-xs text-text-muted">{trx.category_name} • {trx.date}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-text-main text-sm truncate">{trx.description}</p>
+                      <p className="text-xs text-text-muted truncate">{trx.category_name} · {trx.date}</p>
                     </div>
                   </div>
-                  <div className={cn("font-bold", trx.type === 'income' ? "text-green-600" : "text-text-main")}>
-                    {trx.type === 'income' ? '+' : '-'} {formatRupiah(trx.amount)}
+                  <div className={cn(
+                    "shrink-0 font-bold text-sm tabular-nums",
+                    trx.type === 'income' ? "text-green-600" : "text-text-main"
+                  )}>
+                    {trx.type === 'income' ? '+' : '-'}{hideBalance ? '••••' : formatRupiah(trx.amount)}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
