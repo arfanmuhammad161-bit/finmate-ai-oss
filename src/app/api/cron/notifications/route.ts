@@ -1,20 +1,65 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { chatWithGemini } from '@/lib/gemini';
 
-// Fungsi untuk kirim telegram
-async function sendTelegramMessage(chatId: string, text: string) {
+async function logTelegramError(
+  supabaseAdmin: SupabaseClient,
+  chatId: string,
+  errorDetail: string,
+  payload: string
+) {
+  try {
+    await supabaseAdmin.from('error_logs').insert({
+      service: 'Telegram Bot',
+      error_type: 'Send Message Failed',
+      message: `Gagal kirim Telegram ke ${chatId}: ${errorDetail}`,
+      metadata: {
+        chat_id: chatId,
+        source: 'cron/notifications',
+        payload_preview: payload.slice(0, 200),
+      },
+    });
+  } catch {
+    // Jangan biarkan error logging menggagalkan cron utama
+  }
+}
+
+async function sendTelegramMessage(
+  supabaseAdmin: SupabaseClient,
+  chatId: string,
+  text: string
+): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown'
-    })
-  });
+  if (!token) {
+    await logTelegramError(supabaseAdmin, chatId, 'TELEGRAM_BOT_TOKEN tidak diset', text);
+    return false;
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'Markdown',
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '(no body)');
+      await logTelegramError(supabaseAdmin, chatId, `HTTP ${res.status}: ${body}`, text);
+      // Fallback: coba kirim ulang tanpa Markdown (kasus umum: format markdown invalid)
+      const retry = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text }),
+      });
+      return retry.ok;
+    }
+    return true;
+  } catch (err: any) {
+    await logTelegramError(supabaseAdmin, chatId, err?.message || String(err), text);
+    return false;
+  }
 }
 
 export async function GET(req: Request) {
@@ -77,7 +122,7 @@ export async function GET(req: Request) {
           if (income > 0) msg += `💚 Pemasukan: Rp${income.toLocaleString('id-ID')}\n`;
           if (expense > 0) msg += `❤️ Pengeluaran: Rp${expense.toLocaleString('id-ID')}\n`;
           
-          await sendTelegramMessage(profile.telegram_id, msg);
+          await sendTelegramMessage(supabaseAdmin, profile.telegram_id, msg);
         }
       }
 
@@ -112,12 +157,14 @@ export async function GET(req: Request) {
             const percentage = (spent / Number(budget.amount)) * 100;
             if (percentage >= 80 && percentage < 100) {
               await sendTelegramMessage(
-                profile.telegram_id, 
+                supabaseAdmin,
+                profile.telegram_id,
                 `⚠️ *Peringatan Budget!*\n\nPengeluaran kategori *${budget.category_name}* sudah mencapai ${percentage.toFixed(0)}% dari budget bulanan Anda.\n\nSisa budget: Rp${(Number(budget.amount) - spent).toLocaleString('id-ID')}`
               );
             } else if (percentage >= 100) {
               await sendTelegramMessage(
-                profile.telegram_id, 
+                supabaseAdmin,
+                profile.telegram_id,
                 `🚨 *Budget Overlimit!*\n\nPengeluaran kategori *${budget.category_name}* telah MELEBIHI budget bulanan Anda.`
               );
             }
@@ -142,7 +189,8 @@ export async function GET(req: Request) {
         const expense = (txs || []).filter((t: any) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
         
         await sendTelegramMessage(
-          profile.telegram_id, 
+          supabaseAdmin,
+          profile.telegram_id,
           `📊 *Ringkasan Mingguan Anda*\n\nDalam 7 hari terakhir:\n💚 Pemasukan: Rp${income.toLocaleString('id-ID')}\n❤️ Pengeluaran: Rp${expense.toLocaleString('id-ID')}`
         );
       }
@@ -155,11 +203,13 @@ export async function GET(req: Request) {
         
         if (diffDays === 7 || diffDays === 3 || diffDays === 1) {
           await sendTelegramMessage(
+            supabaseAdmin,
             profile.telegram_id,
             `⏳ *Masa Trial Anda Tersisa ${diffDays} Hari Lagi!*\n\nJangan lupa untuk segera upgrade ke akun Pro untuk terus menikmati semua fitur tanpa batas.`
           );
         } else if (diffDays === 0) {
           await sendTelegramMessage(
+            supabaseAdmin,
             profile.telegram_id,
             `❌ *Masa Trial FinMate AI Anda Telah Berakhir!*\n\nSilakan kunjungi aplikasi web dan hubungi admin untuk melakukan pembayaran manual agar Anda bisa terus mencatat keuangan.`
           );
@@ -193,6 +243,7 @@ export async function GET(req: Request) {
 
         if (tipMessage) {
           await sendTelegramMessage(
+            supabaseAdmin,
             profile.telegram_id,
             `💡 *Tips Keuangan AI Minggu Ini:*\n\n${tipMessage}`
           );

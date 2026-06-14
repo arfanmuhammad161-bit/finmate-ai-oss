@@ -24,10 +24,17 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local env files - JANGAN di-commit!
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env
+.env.*
+!.env.example
+
+# File test/debug sementara di root - jangan commit
+/test-*.js
+/test-*.mjs
+/test.js
+/check_*.js
+/check_*.mjs
+/create_*.js
 
 # Vercel
 .vercel
