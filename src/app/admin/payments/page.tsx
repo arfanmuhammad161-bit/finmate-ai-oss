@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { createClient } from '@/lib/supabase/client';
 import { Check, X, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/Toast';
 
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -45,10 +46,10 @@ export default function AdminPaymentsPage() {
       
       if (!res.ok) throw new Error(data.error || 'Terjadi kesalahan');
       
-      alert(action === 'approve' ? 'Pembayaran berhasil disetujui!' : 'Pembayaran ditolak.');
+      toast.success(action === 'approve' ? 'Pembayaran disetujui dan akun user diaktifkan.' : 'Pembayaran ditolak.');
       fetchPayments();
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Gagal memproses pembayaran.');
     } finally {
       setActionLoading(null);
     }

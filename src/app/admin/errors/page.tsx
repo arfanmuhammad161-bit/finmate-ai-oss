@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Terminal, Database, Webhook, Bot, MessageSquare, CheckCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/Toast';
 
 const initialErrors = [
   { id: 1, service: 'n8n Workflow', type: 'Webhook Timeout', message: 'Failed to process incoming transaction receipt from Telegram.', time: '10 mins ago', status: 'Unresolved', icon: Webhook, color: 'text-orange-500', bg: 'bg-orange-100' },
@@ -111,7 +112,7 @@ export default function ErrorCenterPage() {
                           </div>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="shrink-0 bg-white" onClick={() => alert(`[${error.service}] ${error.message}`)}>
+                      <Button variant="outline" size="sm" className="shrink-0 bg-white" onClick={() => toast.info(`[${error.service}] ${error.message}`, 8000)}>
                         Detail
                       </Button>
                     </div>

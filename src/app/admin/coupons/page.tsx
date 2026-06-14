@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Loader2, Trash2, Ticket, Copy, Share2, Tag, Layers, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/Toast';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -57,12 +59,15 @@ export default function AdminCouponsPage() {
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('Disalin ke clipboard!');
+    toast.success('Berhasil disalin ke clipboard.');
   };
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !code || !discountValue || !validFrom || !validUntil) return alert('Harap isi kolom wajib (*)');
+    if (!name || !code || !discountValue || !validFrom || !validUntil) {
+      toast.warning('Harap isi semua kolom wajib (bertanda *).');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -86,7 +91,7 @@ export default function AdminCouponsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal membuat kupon');
 
-      alert('Kupon berhasil dibuat!');
+      toast.success('Kupon berhasil dibuat.');
       // Reset form
       setName('');
       setCode('');
@@ -95,22 +100,29 @@ export default function AdminCouponsPage() {
       setMinPurchaseAmount('');
       fetchCoupons();
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message || 'Gagal membuat kupon.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteCoupon = async (id: string) => {
-    if (!confirm('Yakin ingin menghapus kupon ini?')) return;
-    
+    const ok = await confirmDialog({
+      title: 'Hapus kupon?',
+      message: 'Kupon akan dihapus dari sistem dan tidak bisa digunakan lagi.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
     setDeleteLoading(id);
     try {
       const res = await fetch(`/api/admin/coupons/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Gagal menghapus kupon');
+      toast.success('Kupon berhasil dihapus.');
       fetchCoupons();
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message || 'Gagal menghapus kupon.');
     } finally {
       setDeleteLoading(null);
     }

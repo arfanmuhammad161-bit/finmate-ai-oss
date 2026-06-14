@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Plus, Target, Sparkles, TrendingUp, X } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 interface Goal {
   id: string;
@@ -46,7 +47,15 @@ export default function GoalsPage() {
   useEffect(() => { fetchGoals(); }, [fetchGoals]);
 
   const handleCreate = async () => {
-    if (!form.name || !form.target_amount) return;
+    if (!form.name || !form.target_amount) {
+      toast.warning('Mohon isi nama dan target nominal terlebih dahulu.');
+      return;
+    }
+    const target = parseInt(form.target_amount);
+    if (isNaN(target) || target <= 0) {
+      toast.warning('Target nominal harus berupa angka lebih dari nol.');
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -56,7 +65,7 @@ export default function GoalsPage() {
       const { error } = await supabase.from('goals').insert({
         user_id: user.id,
         name: form.name,
-        target_amount: parseInt(form.target_amount),
+        target_amount: target,
         current_amount: 0,
         deadline: form.deadline || null,
         color: '#3b82f6'
@@ -66,10 +75,11 @@ export default function GoalsPage() {
 
       setForm({ name: '', target_amount: '', deadline: '' });
       setShowModal(false);
+      toast.success('Target keuangan berhasil dibuat.');
       await fetchGoals();
     } catch (e) {
       console.error(e);
-      alert('Gagal membuat target. Silakan coba lagi.');
+      toast.error('Gagal membuat target. Silakan coba lagi.');
     } finally {
       setSaving(false);
     }
@@ -77,7 +87,10 @@ export default function GoalsPage() {
 
   const handleTopUp = async (goalId: string, currentAmount: number) => {
     const addAmount = parseInt(topUpAmount[goalId] || '0');
-    if (!addAmount) return;
+    if (!addAmount || addAmount <= 0) {
+      toast.warning('Mohon isi jumlah top up terlebih dahulu.');
+      return;
+    }
     setSavingId(goalId);
     try {
       const supabase = createClient();
@@ -88,10 +101,11 @@ export default function GoalsPage() {
       if (error) throw error;
 
       setTopUpAmount(prev => ({ ...prev, [goalId]: '' }));
+      toast.success(`Berhasil tambah Rp${addAmount.toLocaleString('id-ID')} ke target.`);
       await fetchGoals();
     } catch (e) {
       console.error(e);
-      alert('Gagal melakukan top up. Silakan coba lagi.');
+      toast.error('Gagal melakukan top up. Silakan coba lagi.');
     } finally {
       setSavingId(null);
     }

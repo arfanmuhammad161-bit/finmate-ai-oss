@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Users as UsersIcon, Search, Loader2, Trash2, Key, Mail, Target, Bell, Calendar, X, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from '@/components/ui/Toast';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -120,22 +122,27 @@ export default function AdminUsersPage() {
                         <button 
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Hapus permanen user ${user.full_name || user.email}?`)) {
-                              try {
-                                const res = await fetch('/api/user/delete', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ userId: user.id })
-                                });
-                                if (res.ok) {
-                                  setUsers(users.filter(u => u.id !== user.id));
-                                  alert('User berhasil dihapus.');
-                                } else {
-                                  alert('Gagal menghapus user.');
-                                }
-                              } catch (e) {
-                                alert('Error saat menghapus user.');
+                            const ok = await confirmDialog({
+                              title: 'Hapus user permanen?',
+                              message: `Semua data milik ${user.full_name || user.email} akan dihapus permanen dan tidak bisa dipulihkan.`,
+                              confirmLabel: 'Ya, hapus',
+                              tone: 'danger',
+                            });
+                            if (!ok) return;
+                            try {
+                              const res = await fetch('/api/user/delete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId: user.id })
+                              });
+                              if (res.ok) {
+                                setUsers(users.filter(u => u.id !== user.id));
+                                toast.success('User berhasil dihapus.');
+                              } else {
+                                toast.error('Gagal menghapus user.');
                               }
+                            } catch (e) {
+                              toast.error('Terjadi kesalahan saat menghapus user.');
                             }
                           }}
                           className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"

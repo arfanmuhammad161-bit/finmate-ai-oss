@@ -2,6 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Settings } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 export default function AdminSettingsPage() {
   return (
@@ -22,7 +23,7 @@ export default function AdminSettingsPage() {
             <label className="text-sm font-medium text-text-main">Google Gemini API Key</label>
             <div className="flex gap-2">
               <input type="password" placeholder="AIzaSy..." className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" defaultValue="AIzaSy*************************" />
-              <button className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700" onClick={() => alert('Fitur simpan kunci API ke environment variable akan tersedia setelah setup database config.')}>Simpan</button>
+              <button className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700" onClick={() => toast.info('Untuk saat ini, ganti kunci API lewat Vercel Environment Variables. Fitur ini akan tersedia setelah setup database config.')}>Simpan</button>
             </div>
             <p className="text-xs text-text-muted">Gunakan API Key yang memiliki limit cukup untuk menghindari Error 429.</p>
           </div>
@@ -31,7 +32,7 @@ export default function AdminSettingsPage() {
             <label className="text-sm font-medium text-text-main">n8n Webhook URL (Opsional)</label>
             <div className="flex gap-2">
               <input type="text" placeholder="https://n8n.example.com/webhook/..." className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-              <button className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700" onClick={() => alert('Fitur n8n sedang dalam pengembangan.')}>Simpan</button>
+              <button className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700" onClick={() => toast.info('Integrasi n8n sedang dalam pengembangan.')}>Simpan</button>
             </div>
             <p className="text-xs text-text-muted">Untuk menjalankan alur AI kompleks di luar aplikasi utama.</p>
           </div>
@@ -62,7 +63,7 @@ export default function AdminSettingsPage() {
             <label className="text-sm font-medium text-text-main">Kata Sandi Baru</label>
             <input type="password" placeholder="Minimal 6 karakter" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
           </div>
-          <button className="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700" onClick={() => alert('Ubah password admin bisa dilakukan lewat halaman Settings User (di luar admin).')}>Update Password</button>
+          <button className="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700" onClick={() => toast.info('Untuk ganti password admin, gunakan halaman Settings di dashboard user.')}>Update Password</button>
         </CardContent>
       </Card>
     </div>

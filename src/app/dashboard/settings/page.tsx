@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from '@/components/ui/Toast';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const tabs = [
   { id: 'profile', label: 'Profil', icon: User },
@@ -192,7 +194,7 @@ function SettingsContent() {
 
   const submitPaymentProof = async () => {
     if (!isFree && !paymentProof) {
-      alert('Harap unggah bukti transfer terlebih dahulu.');
+      toast.warning('Harap unggah bukti transfer terlebih dahulu.');
       return;
     }
     try {
@@ -231,17 +233,17 @@ function SettingsContent() {
       if (!res.ok) throw new Error(resData.error || 'Gagal menyimpan data pembayaran');
 
       if (isFree) {
-        alert('Kupon berhasil diklaim! Paket langganan Anda sudah aktif.');
-        window.location.reload();
+        toast.success('Kupon berhasil diklaim! Paket langganan Anda sudah aktif.');
+        setTimeout(() => window.location.reload(), 1200);
       } else {
-        alert('Bukti transfer berhasil dikirim! Silakan tunggu verifikasi admin (maks. 1x24 jam).');
+        toast.success('Bukti transfer berhasil dikirim! Tunggu verifikasi admin (maks. 1x24 jam).');
         setShowPaymentModal(false);
         setPaymentProof(null);
         setAppliedCoupon(null);
         loadData(); // Refresh history
       }
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message || 'Terjadi kesalahan saat memproses pembayaran.');
     } finally {
       setSubmittingPayment(false);
     }
@@ -747,7 +749,7 @@ function SettingsContent() {
                         <p className="text-sm text-text-muted">🎤 Voice note → ditranskripsi & dicatat</p>
                         <p className="text-sm text-text-muted">📊 Ketik <span className="font-mono bg-white px-2 py-0.5 rounded border">/laporan</span> untuk ringkasan bulanan</p>
                       </div>
-                      <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setTelegramConnected(false); alert('Koneksi Telegram telah diputuskan.'); }}>
+                      <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setTelegramConnected(false); toast.success('Koneksi Telegram telah diputuskan.'); }}>
                         Putuskan Koneksi Telegram
                       </Button>
                     </div>
@@ -824,12 +826,12 @@ function SettingsContent() {
                   </div>
                   <div className="flex justify-end">
                     <Button variant="gradient" onClick={async () => {
-                      if (!oldPassword || !newPassword || !confirmPassword) { alert('Semua field harus diisi.'); return; }
-                      if (newPassword !== confirmPassword) { alert('Password baru dan konfirmasi tidak cocok.'); return; }
-                      if (newPassword.length < 6) { alert('Password baru minimal 6 karakter.'); return; }
+                      if (!oldPassword || !newPassword || !confirmPassword) { toast.warning('Semua kolom password harus diisi.'); return; }
+                      if (newPassword !== confirmPassword) { toast.warning('Password baru dan konfirmasi tidak cocok.'); return; }
+                      if (newPassword.length < 6) { toast.warning('Password baru minimal 6 karakter.'); return; }
                       const supabase = createClient();
                       const { error } = await supabase.auth.updateUser({ password: newPassword });
-                      if (error) { alert('Gagal mengubah password: ' + error.message); } else { alert('Password berhasil diubah!'); setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }
+                      if (error) { toast.error('Gagal mengubah password: ' + error.message); } else { toast.success('Password berhasil diubah.'); setOldPassword(''); setNewPassword(''); setConfirmPassword(''); }
                     }}>Ubah Password</Button>
                   </div>
                 </div>
@@ -840,27 +842,33 @@ function SettingsContent() {
                       <p className="text-sm text-text-muted mt-1">Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data Anda.</p>
                     </div>
                     <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 shrink-0" onClick={async () => {
-                      if (window.confirm('Apakah Anda yakin ingin menghapus akun? Tindakan ini tidak dapat dibatalkan dan semua data Anda akan hilang.')) {
-                        try {
-                          const supabase = createClient();
-                          const { data: { user } } = await supabase.auth.getUser();
-                          if (!user) return;
-                          
-                          const res = await fetch('/api/user/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: user.id })
-                          });
-                          
-                          if (res.ok) {
-                            await supabase.auth.signOut();
-                            router.push('/login');
-                          } else {
-                            alert('Gagal menghapus akun.');
-                          }
-                        } catch (e) {
-                          alert('Terjadi kesalahan saat menghapus akun.');
+                      const ok = await confirmDialog({
+                        title: 'Hapus akun permanen?',
+                        message: 'Semua data keuangan, transaksi, dan pengaturan Anda akan dihapus selamanya. Tindakan ini tidak bisa dibatalkan.',
+                        confirmLabel: 'Ya, hapus akun saya',
+                        cancelLabel: 'Batal',
+                        tone: 'danger',
+                      });
+                      if (!ok) return;
+                      try {
+                        const supabase = createClient();
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        const res = await fetch('/api/user/delete', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ userId: user.id })
+                        });
+
+                        if (res.ok) {
+                          await supabase.auth.signOut();
+                          router.push('/login');
+                        } else {
+                          toast.error('Gagal menghapus akun.');
                         }
+                      } catch (e) {
+                        toast.error('Terjadi kesalahan saat menghapus akun.');
                       }
                     }}>
                       Hapus Akun

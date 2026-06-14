@@ -8,6 +8,8 @@ import { Plus, Search, ArrowDownRight, ArrowUpRight, X, Loader2, Trash2 } from '
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
+import { toast } from '@/components/ui/Toast';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 const categoryList = [
   "Makanan", "Transportasi", "Hiburan", "Belanja", "Tagihan", "Kesehatan", "Pendidikan", "Lainnya",
@@ -67,7 +69,15 @@ function TransactionsContent() {
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   const handleSave = async () => {
-    if (!amount || !desc) return;
+    const amountNum = parseInt(amount);
+    if (!amount || !desc) {
+      toast.warning('Mohon isi jumlah dan keterangan terlebih dahulu.');
+      return;
+    }
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.warning('Jumlah harus berupa angka lebih dari nol.');
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -77,7 +87,7 @@ function TransactionsContent() {
       const { error } = await supabase.from('transactions').insert({
         user_id: user.id,
         type: txType,
-        amount: parseInt(amount),
+        amount: amountNum,
         description: desc,
         category_name: category || (txType === 'income' ? 'Gaji' : 'Lainnya'),
         date,
@@ -90,25 +100,33 @@ function TransactionsContent() {
       setAmount(''); setDesc(''); setCategory('');
       setDate(new Date().toISOString().split('T')[0]);
       setShowModal(false);
+      toast.success('Transaksi berhasil disimpan.');
       await fetchTransactions();
     } catch (e) {
       console.error(e);
-      alert('Gagal menyimpan transaksi. Silakan coba lagi.');
+      toast.error('Gagal menyimpan transaksi. Silakan coba lagi.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Yakin ingin menghapus transaksi ini?')) return;
+    const ok = await confirmDialog({
+      title: 'Hapus transaksi?',
+      message: 'Transaksi yang dihapus tidak bisa dikembalikan.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const supabase = createClient();
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) {
       console.error(error);
-      alert('Gagal menghapus transaksi. Silakan coba lagi.');
+      toast.error('Gagal menghapus transaksi. Silakan coba lagi.');
       return;
     }
     setTransactions(prev => prev.filter(t => t.id !== id));
+    toast.success('Transaksi berhasil dihapus.');
   };
 
   const filtered = transactions.filter(t => {

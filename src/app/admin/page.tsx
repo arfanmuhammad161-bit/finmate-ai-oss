@@ -8,6 +8,7 @@ import { Users, UserPlus, CreditCard, TrendingUp, DollarSign, Download, Loader2 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from '@/components/ui/Toast';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function AdminDashboardPage() {
 
   const handleExportData = () => {
     if (!metrics || !metrics.recentUsers || metrics.recentUsers.length === 0) {
-      alert("Tidak ada data user untuk diekspor (Atau API Key belum dikonfigurasi).");
+      toast.warning('Tidak ada data user untuk diekspor.');
       return;
     }
 

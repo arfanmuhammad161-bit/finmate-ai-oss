@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MessageSquare, Send, Bell, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 
 export default function AdminBroadcastPage() {
   const [title, setTitle] = useState('');
@@ -26,13 +27,14 @@ export default function AdminBroadcastPage() {
         setSuccess(true);
         setTitle('');
         setMessage('');
+        toast.success('Broadcast berhasil dikirim ke seluruh user.');
         setTimeout(() => setSuccess(false), 3000);
       } else {
-        alert('Gagal mengirim broadcast');
+        toast.error('Gagal mengirim broadcast. Silakan coba lagi.');
       }
     } catch (e) {
       console.error(e);
-      alert('Terjadi kesalahan.');
+      toast.error('Terjadi kesalahan jaringan.');
     } finally {
       setSending(false);
     }
@@ -88,7 +90,7 @@ export default function AdminBroadcastPage() {
                         if (data.title) setTitle(data.title);
                         if (data.message) setMessage(data.message);
                       } catch (e) {
-                        alert('Gagal menggunakan AI');
+                        toast.error('Gagal merapikan pesan dengan AI. Cek koneksi atau coba lagi.');
                       } finally {
                         setSending(false);
                       }

@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Plus, AlertTriangle, X } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
+import { confirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface Budget {
   id: string;
@@ -80,7 +82,15 @@ export default function BudgetPage() {
   useEffect(() => { fetchBudgets(); }, [fetchBudgets]);
 
   const handleCreate = async () => {
-    if (!form.category_name || !form.amount) return;
+    if (!form.category_name || !form.amount) {
+      toast.warning('Mohon pilih kategori dan isi nominal anggaran.');
+      return;
+    }
+    const amountNum = parseInt(form.amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.warning('Nominal anggaran harus lebih dari nol.');
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -90,7 +100,7 @@ export default function BudgetPage() {
       const { error } = await supabase.from('budgets').upsert({
         user_id: user.id,
         category_name: form.category_name,
-        amount: parseInt(form.amount),
+        amount: amountNum,
         month,
         year
       }, { onConflict: 'user_id,category_name,month,year' });
@@ -99,20 +109,32 @@ export default function BudgetPage() {
 
       setForm({ category_name: '', amount: '' });
       setShowModal(false);
+      toast.success('Anggaran berhasil disimpan.');
       await fetchBudgets();
     } catch (e) {
       console.error(e);
-      alert('Gagal menyimpan budget. Silakan coba lagi.');
+      toast.error('Gagal menyimpan anggaran. Silakan coba lagi.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Yakin ingin menghapus budget ini?')) return;
+    const ok = await confirmDialog({
+      title: 'Hapus anggaran?',
+      message: 'Anggaran kategori ini akan dihapus untuk bulan berjalan.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const supabase = createClient();
-    await supabase.from('budgets').delete().eq('id', id);
+    const { error } = await supabase.from('budgets').delete().eq('id', id);
+    if (error) {
+      toast.error('Gagal menghapus anggaran.');
+      return;
+    }
     setBudgets(prev => prev.filter(b => b.id !== id));
+    toast.success('Anggaran berhasil dihapus.');
   };
 
   if (loading) {

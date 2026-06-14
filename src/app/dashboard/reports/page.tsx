@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Download, FileText, CalendarDays, CalendarIcon, SlidersHorizontal, Sparkles, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from '@/components/ui/Toast';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -286,7 +287,7 @@ export default function ReportsPage() {
       doc.save(`Laporan_FinMate_${monthName.replace(/ /g, '_')}.pdf`);
     } catch (e) {
       console.error('Gagal generate PDF:', e);
-      alert('Maaf, terjadi kesalahan saat membuat PDF.');
+      toast.error('Maaf, terjadi kesalahan saat membuat PDF.');
     } finally {
       setIsDownloading(false);
     }
