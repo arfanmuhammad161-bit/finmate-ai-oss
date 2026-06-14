@@ -84,8 +84,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           onMenuClick={() => setIsSidebarOpen(true)} 
           onDesktopMenuClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
         />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">
-          <div className="max-w-6xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 scroll-smooth">
+          <div className="max-w-[1536px] mx-auto">
             {children}
           </div>
         </main>

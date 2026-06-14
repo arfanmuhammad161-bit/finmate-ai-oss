@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import {
   ArrowUpRight, ArrowDownRight, Wallet, Coins, Bot, Sparkles,
-  TrendingUp, TrendingDown, Clock, Crown, Plus, FileText, Receipt, ChevronRight, Eye, EyeOff
+  TrendingUp, TrendingDown, Clock, Crown, Plus, FileText, Receipt, ChevronRight, Eye, EyeOff,
+  PieChart, Target, Flame, Send, Smartphone
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,23 @@ interface DashboardStats {
   savings: number;
   trialDaysLeft: number;
   userName: string;
+  totalTxCount: number;
+  fromTelegram: number;
+  fromWeb: number;
+}
+
+interface CategoryStat {
+  name: string;
+  amount: number;
+  percentage: number;
+}
+
+interface BudgetStat {
+  id: string;
+  category_name: string;
+  amount: number;
+  spent: number;
+  percentage: number;
 }
 
 function getGreeting(): { greeting: string; emoji: string } {
@@ -59,6 +77,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [topCategories, setTopCategories] = useState<CategoryStat[]>([]);
+  const [topBudgets, setTopBudgets] = useState<BudgetStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [hideBalance, setHideBalance] = useState(false);
 
@@ -97,6 +117,41 @@ export default function DashboardPage() {
       };
     });
 
+    // Top kategori pengeluaran
+    const categoryMap = new Map<string, number>();
+    allTxs.filter(t => t.type === 'expense').forEach(t => {
+      const k = t.category_name || 'Lainnya';
+      categoryMap.set(k, (categoryMap.get(k) || 0) + Number(t.amount));
+    });
+    const topCats: CategoryStat[] = Array.from(categoryMap.entries())
+      .map(([name, amount]) => ({ name, amount, percentage: expense > 0 ? (amount / expense) * 100 : 0 }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 4);
+
+    // Sumber pencatatan
+    const fromTelegram = allTxs.filter(t => t.source === 'telegram').length;
+    const fromWeb = allTxs.filter(t => t.source === 'web').length;
+
+    // Budget snapshot (3 budget paling banyak terpakai)
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const { data: budgetData } = await supabase
+      .from('budgets')
+      .select('id, category_name, amount')
+      .eq('user_id', user.id)
+      .eq('month', month)
+      .eq('year', year);
+
+    const budgetsWithSpent: BudgetStat[] = (budgetData || []).map(b => {
+      const spent = allTxs
+        .filter(t => t.type === 'expense' && t.category_name === b.category_name)
+        .reduce((s, t) => s + Number(t.amount), 0);
+      const percentage = Math.min(100, (spent / Math.max(1, Number(b.amount))) * 100);
+      return { id: b.id, category_name: b.category_name, amount: Number(b.amount), spent, percentage };
+    })
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 3);
+
     const trialDaysLeft = (sub?.expires_at && user.email !== 'arfanmuhammad161@gmail.com')
       ? Math.max(0, Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / 86400000))
       : 0;
@@ -107,10 +162,15 @@ export default function DashboardPage() {
       expense,
       savings: Math.max(0, income - expense),
       trialDaysLeft,
-      userName: profile?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'User'
+      userName: profile?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'User',
+      totalTxCount: allTxs.length,
+      fromTelegram,
+      fromWeb,
     });
     setTransactions(allTxs.slice(0, 5));
     setChartData(last7);
+    setTopCategories(topCats);
+    setTopBudgets(budgetsWithSpent);
     setLoading(false);
   }, []);
 
@@ -322,9 +382,14 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* CHART + INSIGHT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="lg:col-span-2">
+      {/* MAIN GRID — 2-col di xl+, single col di bawahnya */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-5 sm:gap-6">
+        {/* MAIN COLUMN */}
+        <div className="space-y-5 sm:space-y-6 min-w-0">
+
+      {/* CHART (di main col) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-1 gap-4 sm:gap-6">
+        <Card className="lg:col-span-2 xl:col-span-1">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -379,8 +444,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* AI Insight */}
-        <Card className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border-orange-200">
+        {/* AI Insight — tampil di lg sebagai sidebar chart, di xl pindah ke kolom kanan */}
+        <Card className="xl:hidden bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border-orange-200">
           <CardContent className="p-5 sm:p-6 h-full flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-sm">
@@ -465,6 +530,176 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+        </div>
+        {/* SIDE COLUMN — hanya muncul di xl+ untuk mengisi ruang lebar */}
+        <div className="hidden xl:flex flex-col gap-5 sm:gap-6">
+          {/* Insight AI */}
+          <Card className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border-orange-200">
+            <CardContent className="p-5 h-full flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-sm">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <h3 className="font-bold text-orange-900">Insight AI</h3>
+              </div>
+              <p className="text-sm text-orange-900/80 leading-relaxed flex-1">
+                {stats && stats.income > 0
+                  ? stats.savings > 0
+                    ? `Mantap! Bulan ini Anda berhasil menghemat ${formatRupiah(stats.savings)}. Pertahankan kebiasaan ini untuk masa depan yang lebih tenang. 🌱`
+                    : 'Pengeluaran melebihi pemasukan bulan ini. Yuk cek kategori mana yang paling besar dan evaluasi bersama AI Assistant.'
+                  : 'Belum ada catatan keuangan bulan ini. Mulai dari yang kecil — bahkan secangkir kopi pagi pun penting untuk dicatat. ☕'}
+              </p>
+              <Link href="/dashboard/ai-assistant" className="mt-4">
+                <Button variant="link" className="px-0 h-auto text-orange-700 font-semibold">
+                  Diskusi dengan AI <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Top Kategori Pengeluaran */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                    <Flame className="h-4 w-4" />
+                  </div>
+                  <CardTitle className="text-base">Kategori Boros</CardTitle>
+                </div>
+                <Link href="/dashboard/reports">
+                  <Button variant="ghost" size="sm" className="text-text-muted hover:text-primary-600 h-auto p-1 text-xs">
+                    Detail <ChevronRight className="ml-0.5 h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+              <CardDescription className="text-xs mt-1">4 kategori pengeluaran terbesar bulan ini</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {topCategories.length === 0 ? (
+                <div className="text-center py-6 text-sm text-text-muted">
+                  <PieChart className="h-10 w-10 mx-auto text-gray-200 mb-2" />
+                  Belum ada pengeluaran
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topCategories.map((cat, i) => (
+                    <div key={cat.name}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            "h-5 w-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0",
+                            i === 0 ? "bg-red-100 text-red-700" : i === 1 ? "bg-orange-100 text-orange-700" : i === 2 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-700"
+                          )}>{i + 1}</span>
+                          <span className="font-medium text-text-main truncate">{cat.name}</span>
+                        </div>
+                        <span className="font-bold text-text-main text-xs tabular-nums shrink-0">
+                          {hideBalance ? '••••' : formatRupiah(cat.amount)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            i === 0 ? "bg-gradient-to-r from-red-400 to-red-500" : i === 1 ? "bg-gradient-to-r from-orange-400 to-orange-500" : i === 2 ? "bg-gradient-to-r from-amber-400 to-amber-500" : "bg-gradient-to-r from-gray-300 to-gray-400"
+                          )}
+                          style={{ width: `${Math.max(4, cat.percentage)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Anggaran Snapshot */}
+          {topBudgets.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Target className="h-4 w-4" />
+                    </div>
+                    <CardTitle className="text-base">Anggaran Aktif</CardTitle>
+                  </div>
+                  <Link href="/dashboard/budget">
+                    <Button variant="ghost" size="sm" className="text-text-muted hover:text-primary-600 h-auto p-1 text-xs">
+                      Detail <ChevronRight className="ml-0.5 h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {topBudgets.map(b => (
+                  <div key={b.id}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium text-text-main truncate">{b.category_name}</span>
+                      <span className={cn(
+                        "font-bold text-xs tabular-nums",
+                        b.percentage >= 100 ? "text-red-600" : b.percentage >= 80 ? "text-orange-600" : "text-text-main"
+                      )}>
+                        {Math.round(b.percentage)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          b.percentage >= 100 ? "bg-red-500" : b.percentage >= 80 ? "bg-orange-500" : "bg-gradient-to-r from-blue-400 to-blue-500"
+                        )}
+                        style={{ width: `${Math.min(100, b.percentage)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cara catat singkat */}
+          <Card className="bg-gradient-to-br from-primary-50 via-white to-secondary-50 border-primary-100">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center shadow-sm">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <h3 className="font-bold text-text-main text-sm">Cara catat cepat</h3>
+              </div>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="h-6 w-6 rounded-lg bg-white border border-primary-200 flex items-center justify-center shrink-0 mt-0.5">
+                    <Smartphone className="h-3.5 w-3.5 text-primary-600" />
+                  </div>
+                  <div className="text-text-muted leading-relaxed">
+                    <span className="font-semibold text-text-main">Via web:</span> klik tombol <span className="font-medium text-primary-700">Catat Transaksi</span> di atas.
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <div className="h-6 w-6 rounded-lg bg-white border border-primary-200 flex items-center justify-center shrink-0 mt-0.5">
+                    <Send className="h-3.5 w-3.5 text-primary-600" />
+                  </div>
+                  <div className="text-text-muted leading-relaxed">
+                    <span className="font-semibold text-text-main">Via Telegram:</span> ketik bebas seperti <span className="font-mono bg-white px-1.5 py-0.5 rounded border text-primary-700">"kopi 18rb"</span>, AI yang catat.
+                  </div>
+                </div>
+              </div>
+              {(stats?.fromTelegram || stats?.fromWeb) ? (
+                <div className="mt-3 pt-3 border-t border-primary-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-text-muted">
+                    <Send className="h-3 w-3" />Telegram: <span className="font-bold text-text-main">{stats?.fromTelegram ?? 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-text-muted">
+                    <Smartphone className="h-3 w-3" />Web: <span className="font-bold text-text-main">{stats?.fromWeb ?? 0}</span>
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
