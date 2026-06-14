@@ -157,7 +157,7 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
           {goals.map((goal) => {
             const percentage = Math.min(100, Math.round((goal.current_amount / Math.max(1, goal.target_amount)) * 100));
             const remaining = goal.target_amount - goal.current_amount;

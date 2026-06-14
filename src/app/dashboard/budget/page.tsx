@@ -208,7 +208,7 @@ export default function BudgetPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {budgets.map((budget) => {
             const spent = budget.spent || 0;
             const percentage = Math.min(100, Math.round((spent / Math.max(1, budget.amount)) * 100));
