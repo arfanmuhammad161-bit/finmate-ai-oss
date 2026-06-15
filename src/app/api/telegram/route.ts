@@ -182,6 +182,103 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Handle /pdf command — generate PDF dan kirim sebagai dokumen
+    if (text === '/pdf' || text === '/laporan_pdf' || text === '/laporanpdf') {
+      // Fire-and-forget: kirim "memproses" dulu, generate PDF di background
+      const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
+      if (token) {
+        // Kirim status processing
+        await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, action: 'upload_document' })
+        }).catch(() => {})
+
+        // Generate PDF
+        try {
+          const { generateReportPdf } = await import('@/lib/generateReportPdf')
+
+          const now = new Date()
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+          const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' })
+
+          const { data: txs } = await supabaseAdmin
+            .from('transactions')
+            .select('type, amount, category_name, description, date')
+            .eq('user_id', profile.id)
+            .gte('date', monthStart)
+
+          const all = txs || []
+          const income = all.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+          const expense = all.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+
+          const catBreakdown: Record<string, number> = {}
+          all.filter(t => t.type === 'expense').forEach(t => {
+            const k = t.category_name || 'Lainnya'
+            catBreakdown[k] = (catBreakdown[k] || 0) + Number(t.amount)
+          })
+
+          const topExpenses = all
+            .filter(t => t.type === 'expense')
+            .sort((a, b) => Number(b.amount) - Number(a.amount))
+            .slice(0, 5)
+            .map(t => ({
+              description: t.description || '',
+              category_name: t.category_name || '',
+              amount: Number(t.amount),
+              date: t.date,
+            }))
+
+          const pdfBytes = generateReportPdf({
+            userName: profile.full_name || 'User FinMate',
+            periodLabel: monthName,
+            income,
+            expense,
+            net: income - expense,
+            categoryBreakdown: catBreakdown,
+            topTransactions: topExpenses,
+          })
+
+          // Send PDF via Telegram sendDocument (multipart/form-data)
+          const formData = new FormData()
+          formData.append('chat_id', String(chatId))
+          formData.append('caption', `📄 *Laporan ${monthName}*\n\nBerikut laporan keuangan Anda bulan ini.`)
+          formData.append('parse_mode', 'Markdown')
+          formData.append('document', new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' }), `FinMate_${monthName.replace(/ /g, '_')}.pdf`)
+
+          const sendRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+            method: 'POST',
+            body: formData,
+          })
+
+          if (!sendRes.ok) {
+            const err = await sendRes.text().catch(() => '')
+            console.error('Telegram sendDocument failed:', err)
+            return NextResponse.json({
+              method: 'sendMessage',
+              chat_id: chatId,
+              text: `⚠️ Gagal mengirim PDF. Coba lagi atau lihat di web app.`
+            })
+          }
+
+          // Berhasil — return empty 200 (PDF sudah terkirim via sendDocument)
+          return NextResponse.json({ ok: true })
+        } catch (pdfErr: any) {
+          console.error('PDF generation error:', pdfErr)
+          return NextResponse.json({
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: `⚠️ Gagal membuat PDF: ${pdfErr.message?.substring(0, 100) || 'unknown error'}`
+          })
+        }
+      }
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `⚠️ Bot token tidak tersedia.`
+      })
+    }
+
     // Handle /saldo command
     if (text === '/saldo' || text === '/balance') {
       const now = new Date()
@@ -216,6 +313,7 @@ export async function POST(request: NextRequest) {
           `🎤 Kirim voice note → ditranskripsi & dicatat\n\n` +
           `*Perintah Khusus:*\n` +
           `/laporan - Ringkasan bulan ini\n` +
+          `/pdf - Download laporan PDF bulan ini\n` +
           `/saldo - Cek saldo saat ini\n` +
           `/help - Panduan penggunaan\n\n` +
           `_(ID Telegram Anda: \`${chatId}\`)_`,
