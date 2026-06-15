@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     }
 
     // Kirim ke Telegram dengan retry tanpa Markdown kalau format invalid
-    const token = process.env.TELEGRAM_BOT_TOKEN
+    const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
     if (!token) {
       return NextResponse.json({ error: 'TELEGRAM_BOT_TOKEN belum diset di server' }, { status: 500 })
     }

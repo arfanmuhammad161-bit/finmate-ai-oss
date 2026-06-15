@@ -29,7 +29,7 @@ async function sendTelegramMessage(
   chatId: string,
   text: string
 ): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
   if (!token) {
     await logTelegramError(supabaseAdmin, chatId, 'TELEGRAM_BOT_TOKEN tidak diset', text);
     return false;
@@ -137,8 +137,8 @@ export async function GET(req: Request) {
           if (income > 0) msg += `💚 Pemasukan: Rp${income.toLocaleString('id-ID')}\n`;
           if (expense > 0) msg += `❤️ Pengeluaran: Rp${expense.toLocaleString('id-ID')}\n`;
 
-          await sendTelegramMessage(supabaseAdmin, profile.telegram_id, msg);
-          userActions.push(`✅ daily_summary terkirim (${txs.length} tx)`);
+          const ok = await sendTelegramMessage(supabaseAdmin, profile.telegram_id, msg);
+          userActions.push(ok ? `✅ daily_summary terkirim (${txs.length} tx)` : `❌ daily_summary GAGAL kirim (cek error_logs)`);
         } else {
           userActions.push(`⏭️ daily_summary SKIP: tidak ada transaksi hari ini`);
         }
@@ -171,26 +171,25 @@ export async function GET(req: Request) {
             .gte('date', monthStart);
             
           for (const budget of budgets) {
-            // Match by category_name (lebih reliable daripada category_id yang kadang NULL)
             const spent = (expenses || [])
               .filter((e: any) => (e.category_name || '').toLowerCase() === (budget.category_name || '').toLowerCase())
               .reduce((sum, e) => sum + Number(e.amount), 0);
 
             const percentage = (spent / Number(budget.amount)) * 100;
             if (percentage >= 80 && percentage < 100) {
-              await sendTelegramMessage(
+              const ok = await sendTelegramMessage(
                 supabaseAdmin,
                 profile.telegram_id,
                 `⚠️ *Peringatan Budget!*\n\nPengeluaran kategori *${budget.category_name}* sudah mencapai ${percentage.toFixed(0)}% dari budget bulanan Anda.\n\nSisa budget: Rp${(Number(budget.amount) - spent).toLocaleString('id-ID')}`
               );
-              sentCount++;
+              if (ok) sentCount++;
             } else if (percentage >= 100) {
-              await sendTelegramMessage(
+              const ok = await sendTelegramMessage(
                 supabaseAdmin,
                 profile.telegram_id,
                 `🚨 *Budget Overlimit!*\n\nPengeluaran kategori *${budget.category_name}* telah MELEBIHI budget bulanan Anda.`
               );
-              sentCount++;
+              if (ok) sentCount++;
             }
           }
         }
@@ -219,12 +218,12 @@ export async function GET(req: Request) {
         const income = (txs || []).filter((t: any) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
         const expense = (txs || []).filter((t: any) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
         
-        await sendTelegramMessage(
+        const ok = await sendTelegramMessage(
           supabaseAdmin,
           profile.telegram_id,
           `📊 *Ringkasan Mingguan Anda*\n\nDalam 7 hari terakhir:\n💚 Pemasukan: Rp${income.toLocaleString('id-ID')}\n❤️ Pengeluaran: Rp${expense.toLocaleString('id-ID')}`
         );
-        userActions.push(`✅ weekly_summary terkirim`);
+        userActions.push(ok ? `✅ weekly_summary terkirim` : `❌ weekly_summary GAGAL kirim`);
       }
 
       // 4. Reminder Trial Berakhir
@@ -238,19 +237,19 @@ export async function GET(req: Request) {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
         if (diffDays === 7 || diffDays === 3 || diffDays === 1) {
-          await sendTelegramMessage(
+          const ok = await sendTelegramMessage(
             supabaseAdmin,
             profile.telegram_id,
             `⏳ *Masa Trial Anda Tersisa ${diffDays} Hari Lagi!*\n\nJangan lupa untuk segera upgrade ke akun Pro untuk terus menikmati semua fitur tanpa batas.`
           );
-          userActions.push(`✅ trial_reminder terkirim (sisa ${diffDays} hari)`);
+          userActions.push(ok ? `✅ trial_reminder terkirim (sisa ${diffDays} hari)` : `❌ trial_reminder GAGAL kirim`);
         } else if (diffDays === 0) {
-          await sendTelegramMessage(
+          const ok = await sendTelegramMessage(
             supabaseAdmin,
             profile.telegram_id,
             `❌ *Masa Trial FinMate AI Anda Telah Berakhir!*\n\nSilakan kunjungi aplikasi web dan hubungi admin untuk melakukan pembayaran manual agar Anda bisa terus mencatat keuangan.`
           );
-          userActions.push(`✅ trial_reminder EXPIRED terkirim`);
+          userActions.push(ok ? `✅ trial_reminder EXPIRED terkirim` : `❌ trial_reminder EXPIRED GAGAL kirim`);
         } else {
           userActions.push(`⏭️ trial_reminder SKIP: sisa ${diffDays} hari (window 7/3/1/0)`);
         }
@@ -286,12 +285,12 @@ export async function GET(req: Request) {
         );
 
         if (tipMessage) {
-          await sendTelegramMessage(
+          const ok = await sendTelegramMessage(
             supabaseAdmin,
             profile.telegram_id,
             `💡 *Tips Keuangan AI Minggu Ini:*\n\n${tipMessage}`
           );
-          userActions.push(`✅ ai_tips terkirim`);
+          userActions.push(ok ? `✅ ai_tips terkirim` : `❌ ai_tips GAGAL kirim`);
         } else {
           userActions.push(`⏭️ ai_tips SKIP: Gemini return kosong`);
         }
