@@ -366,6 +366,82 @@ function SettingsContent() {
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <>
+              {/* Kartu Status Akun — ringkas semua info penting */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Status Langganan */}
+                <Card className={cn(
+                  "overflow-hidden",
+                  isAdmin ? "border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50"
+                    : sub?.plan === 'trial' ? "border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50"
+                    : sub?.plan ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50"
+                    : ""
+                )}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Crown className={cn("h-4 w-4", isAdmin ? "text-amber-600" : sub?.plan === 'trial' ? "text-orange-600" : "text-emerald-600")} />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Paket</span>
+                    </div>
+                    <p className="font-bold text-text-main">
+                      {isAdmin ? 'Admin Lifetime' : sub?.plan === 'monthly' ? 'Pro Bulanan' : sub?.plan === 'yearly' ? 'Pro Tahunan' : sub?.plan === 'trial' ? 'Trial Gratis' : 'Memuat...'}
+                    </p>
+                    {!isAdmin && sub?.plan && (
+                      <p className="text-xs text-text-muted mt-0.5">
+                        {sub.plan === 'trial' ? `${trialDaysLeft} hari tersisa` : `Berakhir ${expiresDateStr}`}
+                      </p>
+                    )}
+                    {isAdmin && <p className="text-xs text-text-muted mt-0.5">Akses penuh selamanya</p>}
+                  </CardContent>
+                </Card>
+
+                {/* Sisa Hari / Countdown */}
+                <Card className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Clock className="h-4 w-4 text-primary-600" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Masa Aktif</span>
+                    </div>
+                    {isAdmin ? (
+                      <p className="font-bold text-text-main">∞ Unlimited</p>
+                    ) : sub?.plan === 'trial' ? (
+                      <>
+                        <p className={cn("font-bold tabular-nums", trialDaysLeft <= 3 ? "text-red-600" : "text-text-main")}>
+                          {trialDaysLeft} <span className="text-sm font-normal text-text-muted">hari lagi</span>
+                        </p>
+                        {trialDaysLeft <= 3 && <p className="text-xs text-red-600 mt-0.5">Segera berakhir!</p>}
+                      </>
+                    ) : sub?.expires_at ? (
+                      <p className="font-bold text-text-main tabular-nums">
+                        {Math.max(0, Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / 86400000))} <span className="text-sm font-normal text-text-muted">hari lagi</span>
+                      </p>
+                    ) : (
+                      <p className="font-bold text-text-muted">—</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Status Telegram */}
+                <Card className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Bot className="h-4 w-4 text-secondary-600" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Telegram</span>
+                    </div>
+                    {telegramConnected ? (
+                      <p className="font-bold text-green-600 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4" />Terhubung
+                      </p>
+                    ) : (
+                      <>
+                        <p className="font-bold text-text-muted">Belum terhubung</p>
+                        <button onClick={() => setActiveTab('telegram')} className="text-xs text-primary-600 hover:underline mt-0.5">
+                          Hubungkan →
+                        </button>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Informasi Profil</CardTitle>
