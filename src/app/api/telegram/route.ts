@@ -326,24 +326,33 @@ export async function POST(request: NextRequest) {
 
       // Routing Intent AI
       if (aiResult.intent === 'record_transaction' && aiResult.transactions && aiResult.transactions.length > 0) {
-        // Insert semua transaksi ke database
+        const todayIso = new Date().toISOString().split('T')[0]
+        // Validasi format tanggal dari AI (kalau ada). Hanya terima YYYY-MM-DD valid.
+        const isValidDate = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(new Date(d).getTime())
+
+        let totalAmount = 0
         for (const parsed of aiResult.transactions) {
+          const useDate = isValidDate(parsed.date) ? parsed.date : todayIso
           await supabaseAdmin.from('transactions').insert({
             user_id: profile.id,
             type: parsed.type,
             amount: parsed.amount,
             description: parsed.description,
             category_name: parsed.category,
-            date: new Date().toISOString().split('T')[0],
+            date: useDate,
             source: 'telegram',
             ai_parsed: true
           })
+          totalAmount += parsed.type === 'expense' ? parsed.amount : 0
         }
 
         let replyText = aiResult.replyText + `\n\n✨ *Mencatat ${aiResult.transactions.length} Transaksi:*\n`
         for (const parsed of aiResult.transactions) {
           const typeText = parsed.type === 'income' ? '💚' : '❤️'
           replyText += `${typeText} ${parsed.description}: Rp${parsed.amount.toLocaleString('id-ID')}\n`
+        }
+        if (aiResult.transactions.length > 1 && totalAmount > 0) {
+          replyText += `\n💰 *Total pengeluaran: Rp${totalAmount.toLocaleString('id-ID')}*`
         }
 
         return NextResponse.json({
