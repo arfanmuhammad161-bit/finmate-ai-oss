@@ -351,78 +351,62 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
+      {/* Segmented control — gaya Stripe, compact & info-dense */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center print:hidden">
+        <div className="inline-flex bg-white border border-border card-depth p-1 rounded-xl shadow-sm">
+          {[
+            { id: 'monthly', label: 'Bulanan', icon: CalendarDays, sub: monthName },
+            { id: 'yearly', label: 'Tahunan', icon: CalendarIcon, sub: `Tahun ${year}` },
+            { id: 'custom', label: 'Custom', icon: SlidersHorizontal, sub: 'Pilih tanggal' },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all",
+                  isActive
+                    ? "bg-gradient-to-br from-primary-500 to-secondary-500 text-white shadow-sm"
+                    : "text-text-muted hover:text-text-main hover:bg-gray-50"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {activeTab !== 'custom' && (
+          <div className="flex items-center gap-1.5 text-xs text-text-muted px-2">
+            <CalendarDays className="h-3.5 w-3.5" />
+            <span>{activeTab === 'monthly' ? monthName : `Tahun ${year}`}</span>
+          </div>
+        )}
 
-        <Card 
-          className={cn("cursor-pointer transition-all hover:border-primary-500", activeTab === 'monthly' ? "border-primary-500 ring-1 ring-primary-500 shadow-md" : "")}
-          onClick={() => setActiveTab('monthly')}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className={cn("p-3 rounded-xl", activeTab === 'monthly' ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-500")}>
-              <CalendarDays className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-text-main">Bulanan</h3>
-              <p className="text-xs text-text-muted">{monthName}</p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card 
-          className={cn("cursor-pointer transition-all hover:border-primary-500", activeTab === 'yearly' ? "border-primary-500 ring-1 ring-primary-500 shadow-md" : "")}
-          onClick={() => setActiveTab('yearly')}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className={cn("p-3 rounded-xl", activeTab === 'yearly' ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-500")}>
-              <CalendarIcon className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-text-main">Tahunan</h3>
-              <p className="text-xs text-text-muted">Tahun {year}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className={cn("cursor-pointer transition-all hover:border-primary-500", activeTab === 'custom' ? "border-primary-500 ring-1 ring-primary-500 shadow-md" : "")}
-          onClick={() => setActiveTab('custom')}
-        >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className={cn("p-3 rounded-xl", activeTab === 'custom' ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-500")}>
-              <SlidersHorizontal className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-text-main">Custom</h3>
-              <p className="text-xs text-text-muted">Pilih Tanggal</p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Inline date picker — hanya muncul saat Custom dipilih */}
+        {activeTab === 'custom' && (
+          <div className="flex items-center gap-2 flex-1 bg-primary-50/40 border border-primary-100 rounded-xl px-3 py-2">
+            <input
+              type="date"
+              className="flex-1 min-w-0 bg-transparent border-0 text-sm focus:outline-none focus:ring-0 text-text-main"
+              value={customStart}
+              onChange={e => setCustomStart(e.target.value)}
+              aria-label="Dari tanggal"
+            />
+            <span className="text-text-muted text-xs">→</span>
+            <input
+              type="date"
+              className="flex-1 min-w-0 bg-transparent border-0 text-sm focus:outline-none focus:ring-0 text-text-main"
+              value={customEnd}
+              onChange={e => setCustomEnd(e.target.value)}
+              aria-label="Sampai tanggal"
+            />
+          </div>
+        )}
       </div>
 
-      {activeTab === 'custom' && (
-        <Card className="print:hidden border border-primary-200 bg-primary-50/30">
-          <CardContent className="p-4 flex flex-col sm:flex-row items-end gap-4">
-            <div className="flex-1 space-y-1 w-full">
-              <label className="text-xs font-medium text-text-muted">Dari Tanggal</label>
-              <input 
-                type="date" 
-                className="w-full flex h-10 rounded-xl border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                value={customStart}
-                onChange={e => setCustomStart(e.target.value)}
-              />
-            </div>
-            <div className="flex-1 space-y-1 w-full">
-              <label className="text-xs font-medium text-text-muted">Sampai Tanggal</label>
-              <input 
-                type="date" 
-                className="w-full flex h-10 rounded-xl border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                value={customEnd}
-                onChange={e => setCustomEnd(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Report Preview */}
       <Card id="report-container" className="overflow-hidden border-none shadow-lg bg-white">
@@ -449,35 +433,50 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <CardContent className="p-6 sm:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-
-            {/* Left Column: Summary & Charts */}
-            <div className="space-y-7">
-              <div>
-                <h3 className="text-sm font-bold text-text-main mb-3 uppercase tracking-wider">Ringkasan</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="h-7 w-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
-                        <ArrowDownRight className="h-3.5 w-3.5" />
-                      </div>
-                      <p className="text-xs font-medium text-green-700">Pemasukan</p>
-                    </div>
-                    <p className="text-lg sm:text-xl font-bold text-green-700 tabular-nums">{formatRupiah(summary.income)}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-100">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="h-7 w-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </div>
-                      <p className="text-xs font-medium text-red-700">Pengeluaran</p>
-                    </div>
-                    <p className="text-lg sm:text-xl font-bold text-red-700 tabular-nums">{formatRupiah(summary.expense)}</p>
-                  </div>
-                </div>
+        <CardContent className="p-5 sm:p-7">
+          {/* Stats Row — full width, info-dense ala Stripe */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-6 pb-6 border-b border-gray-100">
+            <div className="px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                <ArrowDownRight className="h-3 w-3 text-green-500" />Pemasukan
               </div>
+              <div className="text-lg sm:text-xl font-bold text-text-main tabular-nums mt-1">
+                {formatRupiah(summary.income)}
+              </div>
+            </div>
+            <div className="px-3 py-2.5 lg:border-l border-gray-100">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                <ArrowUpRight className="h-3 w-3 text-red-500" />Pengeluaran
+              </div>
+              <div className="text-lg sm:text-xl font-bold text-text-main tabular-nums mt-1">
+                {formatRupiah(summary.expense)}
+              </div>
+            </div>
+            <div className="px-3 py-2.5 lg:border-l border-gray-100">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                <Flame className="h-3 w-3 text-orange-500" />Transaksi
+              </div>
+              <div className="text-lg sm:text-xl font-bold text-text-main tabular-nums mt-1">
+                {topTransactions.length > 0 ? topTransactions.length + Math.max(0, (Object.keys(categoryBreakdown).length - topTransactions.length)) : 0}<span className="text-xs text-text-muted ml-1 font-normal">tx</span>
+              </div>
+            </div>
+            <div className="px-3 py-2.5 lg:border-l border-gray-100">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                <Sparkles className="h-3 w-3 text-secondary-500" />Rata-rata
+              </div>
+              <div className="text-lg sm:text-xl font-bold text-text-main tabular-nums mt-1">
+                {(() => {
+                  const days = activeTab === 'monthly' ? 30 : activeTab === 'yearly' ? 365 : 30;
+                  return formatRupiah(Math.round(summary.expense / days));
+                })()}<span className="text-xs text-text-muted ml-1 font-normal">/hari</span>
+              </div>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 lg:gap-10">
+
+            {/* Left Column: Pie Chart only (Ringkasan sudah di stats row di atas) */}
+            <div className="space-y-7">
               <div>
                 <h3 className="text-sm font-bold text-text-main mb-3 uppercase tracking-wider">Distribusi Pengeluaran</h3>
                 {pieData.length > 0 ? (
