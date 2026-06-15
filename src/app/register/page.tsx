@@ -2,23 +2,21 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { Sparkles, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Check, Loader2, AlertCircle, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { AuthShell } from '@/components/layout/AuthShell';
 
 const goals = [
-  "Mengontrol pengeluaran",
-  "Menabung",
-  "Mengatur budget",
-  "Menganalisis keuangan pribadi"
+  "Kontrol pengeluaran",
+  "Mulai menabung",
+  "Atur anggaran bulanan",
+  "Analisis keuangan pribadi",
 ];
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [selectedGoal, setSelectedGoal] = useState<string>("");
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,7 +31,7 @@ export default function RegisterPage() {
     setError('');
 
     if (!fullName || !email || !password) {
-      setError('Semua field wajib diisi.');
+      setError('Semua kolom wajib diisi.');
       setLoading(false);
       return;
     }
@@ -49,11 +47,11 @@ export default function RegisterPage() {
         email,
         password,
         options: {
-          data: { 
+          data: {
             full_name: fullName,
-            financial_goal: selectedGoal || 'Mengontrol pengeluaran'
+            financial_goal: selectedGoal || 'Kontrol pengeluaran',
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         }
       });
 
@@ -71,112 +69,119 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="h-20 w-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-            <Check className="h-10 w-10 text-green-600" />
+      <AuthShell>
+        <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mx-auto mb-5 shadow-md">
+            <Mail className="h-7 w-7 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-text-main mb-2">Cek Email Anda!</h2>
-          <p className="text-text-muted mb-6">
-            Kami telah mengirim link verifikasi ke <strong>{email}</strong>. Klik link tersebut untuk mengaktifkan akun dan mulai trial 14 hari gratis Anda.
+          <h2 className="text-2xl font-bold text-text-main tracking-tight mb-2">Cek email Anda</h2>
+          <p className="text-sm text-text-muted leading-relaxed mb-6">
+            Kami sudah kirim link verifikasi ke <strong className="text-text-main">{email}</strong>.
+            Klik link itu untuk aktifkan akun & mulai trial gratis 14 hari.
           </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 text-left mb-5">
+            💡 Cek folder <strong>Spam/Promosi</strong> kalau emailnya tidak muncul dalam 2 menit.
+          </div>
           <Link href="/login">
-            <Button variant="gradient" className="w-full h-12">Kembali ke Halaman Masuk</Button>
+            <Button variant="gradient" className="w-full h-11">Kembali ke halaman masuk</Button>
           </Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-40">
-        <div className="absolute top-[10%] left-[20%] w-[40%] h-[40%] rounded-full bg-primary-200 blur-[100px]" />
-        <div className="absolute bottom-[10%] right-[20%] w-[40%] h-[40%] rounded-full bg-secondary-200 blur-[100px]" />
-      </div>
-
-      <div className="w-full max-w-lg relative z-10">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-secondary-500 text-white shadow-lg">
-            <span className="text-2xl font-bold">F</span>
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-gradient">FinMate AI</span>
+    <AuthShell>
+      <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8">
+        <div className="mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Daftar gratis</h2>
+          <p className="text-sm text-text-muted mt-1">14 hari trial, tanpa kartu kredit.</p>
         </div>
 
-        <Card variant="glass" className="border-white/50 bg-white/60 shadow-xl backdrop-blur-xl">
-          <CardHeader className="text-center pb-6">
-            <CardTitle className="text-2xl font-bold">Mulai Perjalanan Anda</CardTitle>
-            <CardDescription>Daftar sekarang dan nikmati akses penuh AI Financial Assistant</CardDescription>
-          </CardHeader>
-          <form onSubmit={handleRegister}>
-            <CardContent className="space-y-6">
-              {error && (
-                <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
-                </div>
-              )}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-main">Nama Lengkap</label>
-                  <Input 
-                    placeholder="Arfan S" className="bg-white/80"
-                    value={fullName} onChange={e => setFullName(e.target.value)} required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-main">Email</label>
-                  <Input 
-                    type="email" placeholder="nama@email.com" className="bg-white/80"
-                    value={email} onChange={e => setEmail(e.target.value)} required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-main">Password</label>
-                  <Input 
-                    type="password" placeholder="Min. 6 karakter" className="bg-white/80"
-                    value={password} onChange={e => setPassword(e.target.value)} required 
-                  />
-                </div>
-              </div>
+        <form onSubmit={handleRegister} className="space-y-4">
+          {error && (
+            <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-text-main">Apa tujuan utama keuangan Anda?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {goals.map((goal) => (
-                    <div
-                      key={goal}
-                      onClick={() => setSelectedGoal(goal)}
-                      className={cn(
-                        "cursor-pointer rounded-xl border p-3 text-sm font-medium transition-all hover:border-primary-500",
-                        selectedGoal === goal 
-                          ? "border-primary-500 bg-primary-50 text-primary-700 shadow-sm" 
-                          : "border-border bg-white/80 text-text-muted hover:bg-white"
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        {goal}
-                        {selectedGoal === goal && <Check className="h-4 w-4 text-primary-600" />}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Nama lengkap</label>
+            <Input
+              placeholder="Misal: Arfan Muhammad"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              required
+              autoComplete="name"
+            />
+          </div>
 
-              <Button type="submit" className="w-full h-12 text-base font-medium mt-2" variant="gradient" disabled={loading}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                {loading ? 'Mendaftar...' : 'Mulai Gratis 14 Hari'}
-              </Button>
-            </CardContent>
-            <CardFooter className="flex justify-center pb-6">
-              <p className="text-sm text-text-muted">
-                Sudah punya akun?{' '}
-                <Link href="/login" className="font-semibold text-primary-600 hover:underline">Masuk di sini</Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Email</label>
+            <Input
+              type="email"
+              placeholder="nama@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Password</label>
+            <Input
+              type="password"
+              placeholder="Minimal 6 karakter"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Tujuan utama Anda?</label>
+            <div className="grid grid-cols-2 gap-2">
+              {goals.map((goal) => (
+                <button
+                  type="button"
+                  key={goal}
+                  onClick={() => setSelectedGoal(goal)}
+                  className={cn(
+                    "rounded-xl border p-2.5 text-xs font-medium transition-all text-left flex items-center justify-between gap-1",
+                    selectedGoal === goal
+                      ? "border-primary-500 bg-primary-50 text-primary-700"
+                      : "border-border bg-white text-text-muted hover:border-primary-300 hover:bg-primary-50/30"
+                  )}
+                >
+                  <span className="leading-tight">{goal}</span>
+                  {selectedGoal === goal && <Check className="h-3.5 w-3.5 text-primary-600 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full h-11 text-base font-semibold mt-2" variant="gradient" disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {loading ? 'Mendaftarkan...' : 'Mulai gratis 14 hari'}
+          </Button>
+
+          <p className="text-[11px] text-text-muted text-center leading-relaxed">
+            Dengan mendaftar, Anda setuju untuk catat keuangan dengan lebih sadar. ✨
+          </p>
+        </form>
+
+        <div className="mt-5 pt-5 border-t border-border text-center">
+          <p className="text-sm text-text-muted">
+            Sudah punya akun?{' '}
+            <Link href="/login" className="font-semibold text-primary-600 hover:underline">
+              Masuk di sini
+            </Link>
+          </p>
+        </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

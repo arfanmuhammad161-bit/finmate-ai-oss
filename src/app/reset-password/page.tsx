@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Lock, CheckCircle2 } from 'lucide-react';
+import { Lock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { AuthShell } from '@/components/layout/AuthShell';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -14,14 +15,15 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [sessionInvalid, setSessionInvalid] = useState(false);
 
   useEffect(() => {
-    // Check if the user has a session, meaning they arrived via the recovery link successfully.
     const checkSession = async () => {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setError('Sesi tidak valid atau telah kedaluwarsa. Silakan ulangi proses lupa sandi.');
+        setSessionInvalid(true);
       }
     };
     checkSession();
@@ -46,15 +48,12 @@ export default function ResetPasswordPage() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
+      const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
         setError(error.message);
       } else {
         setSuccess(true);
-        // Logout after resetting password so they can log in normally.
         await supabase.auth.signOut();
       }
     } catch (err: any) {
@@ -66,84 +65,77 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-xl border border-gray-100 text-center">
-          <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-6">
-            <CheckCircle2 className="h-8 w-8 text-primary-600" />
+      <AuthShell>
+        <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mx-auto mb-5 shadow-md">
+            <CheckCircle2 className="h-7 w-7 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-text-main mb-2">Kata Sandi Berhasil Diubah!</h2>
-          <p className="text-text-muted mb-6">
-            Kata sandi Anda telah berhasil diperbarui. Silakan login kembali dengan kata sandi baru Anda.
+          <h2 className="text-2xl font-bold text-text-main tracking-tight mb-2">Kata sandi diperbarui</h2>
+          <p className="text-sm text-text-muted leading-relaxed mb-6">
+            Sandi Anda sudah diganti. Silakan masuk dengan sandi baru.
           </p>
-          <Button variant="gradient" className="w-full" onClick={() => router.push('/login')}>
-            Ke Halaman Login
+          <Button variant="gradient" className="w-full h-11" onClick={() => router.push('/login')}>
+            Ke halaman masuk
           </Button>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background Ornaments */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-200/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-200/30 rounded-full blur-3xl pointer-events-none" />
+    <AuthShell backHref="/login" backLabel="Kembali ke halaman masuk">
+      <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8">
+        <div className="mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Buat sandi baru</h2>
+          <p className="text-sm text-text-muted mt-1">
+            Masukkan kata sandi baru untuk akun Anda.
+          </p>
+        </div>
 
-      <div className="w-full max-w-md z-10">
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-text-main mb-2">Buat Sandi Baru</h1>
-            <p className="text-text-muted text-sm">
-              Masukkan kata sandi baru untuk akun Anda.
-            </p>
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2">
-              <span className="shrink-0 mt-0.5">⚠️</span>
+            <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-main">Kata Sandi Baru</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <Input 
-                  type="password" 
-                  placeholder="Minimal 6 karakter" 
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Kata sandi baru</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+              <Input
+                type="password"
+                placeholder="Minimal 6 karakter"
+                className="pl-9"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-main">Ulangi Kata Sandi Baru</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <Input 
-                  type="password" 
-                  placeholder="Ulangi kata sandi" 
-                  className="pl-10"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Ulangi sandi</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+              <Input
+                type="password"
+                placeholder="Ulangi kata sandi"
+                className="pl-9"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
+          </div>
 
-            <Button type="submit" variant="gradient" className="w-full py-6 text-base mt-2" disabled={loading || !!error.includes('Sesi tidak valid')}>
-              {loading ? 'Menyimpan...' : 'Simpan Kata Sandi'}
-            </Button>
-          </form>
-        </div>
+          <Button type="submit" variant="gradient" className="w-full h-11 text-base font-semibold mt-2" disabled={loading || sessionInvalid}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {loading ? 'Menyimpan...' : 'Simpan sandi baru'}
+          </Button>
+        </form>
       </div>
-    </div>
+    </AuthShell>
   );
 }

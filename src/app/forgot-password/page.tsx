@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { AuthShell } from '@/components/layout/AuthShell';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -44,73 +45,62 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-xl border border-gray-100 text-center">
-          <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-6">
-            <CheckCircle2 className="h-8 w-8 text-primary-600" />
+      <AuthShell backHref="/login" backLabel="Kembali ke halaman masuk">
+        <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mx-auto mb-5 shadow-md">
+            <CheckCircle2 className="h-7 w-7 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-text-main mb-2">Cek Email Anda</h2>
-          <p className="text-text-muted mb-6">
-            Kami telah mengirimkan link untuk mereset kata sandi ke <strong>{email}</strong>.
+          <h2 className="text-2xl font-bold text-text-main tracking-tight mb-2">Cek email Anda</h2>
+          <p className="text-sm text-text-muted leading-relaxed mb-5">
+            Kami sudah kirim link untuk reset kata sandi ke <strong className="text-text-main">{email}</strong>.
           </p>
-          <Link href="/login" className="text-sm font-medium text-primary-600 hover:text-primary-700">
-            Kembali ke Halaman Login
-          </Link>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 text-left">
+            💡 Cek folder <strong>Spam/Promosi</strong> kalau emailnya tidak muncul dalam 2 menit.
+          </div>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background Ornaments */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-200/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-200/30 rounded-full blur-3xl pointer-events-none" />
+    <AuthShell backHref="/login" backLabel="Kembali ke halaman masuk">
+      <div className="bg-white rounded-3xl border border-border shadow-xl shadow-primary-100/40 p-6 sm:p-8">
+        <div className="mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-text-main tracking-tight">Lupa kata sandi?</h2>
+          <p className="text-sm text-text-muted mt-1">
+            Masukkan email Anda dan kami kirim link untuk buat sandi baru.
+          </p>
+        </div>
 
-      <div className="w-full max-w-md z-10">
-        <Link href="/login" className="inline-flex items-center text-sm font-medium text-text-muted hover:text-text-main mb-6 transition-colors">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Kembali ke Login
-        </Link>
-
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-text-main mb-2">Lupa Kata Sandi?</h1>
-            <p className="text-text-muted text-sm">
-              Masukkan email Anda dan kami akan mengirimkan instruksi untuk mereset kata sandi Anda.
-            </p>
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-start gap-2">
-              <span className="shrink-0 mt-0.5">⚠️</span>
+            <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text-main">Alamat Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <Input 
-                  type="email" 
-                  placeholder="nama@email.com" 
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+              <Input
+                type="email"
+                placeholder="nama@email.com"
+                className="pl-9"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
             </div>
+          </div>
 
-            <Button type="submit" variant="gradient" className="w-full py-6 text-base" disabled={loading}>
-              {loading ? 'Mengirim...' : 'Kirim Link Reset Sandi'}
-            </Button>
-          </form>
-        </div>
+          <Button type="submit" variant="gradient" className="w-full h-11 text-base font-semibold" disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {loading ? 'Mengirim...' : 'Kirim link reset'}
+          </Button>
+        </form>
       </div>
-    </div>
+    </AuthShell>
   );
 }
