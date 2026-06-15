@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function GET() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+    const { supabaseAdmin } = auth;
 
     // Get all subscriptions
     const { data: subs, error: subsError } = await supabaseAdmin
@@ -29,9 +28,9 @@ export async function GET() {
     if (authError) throw authError;
 
     // Merge data
-    const enrichedSubs = (subs || []).map(sub => {
-      const profile = profiles?.find(p => p.id === sub.user_id);
-      const authUser = authUsers.users.find(u => u.id === sub.user_id);
+    const enrichedSubs = (subs || []).map((sub: any) => {
+      const profile = profiles?.find((p: { id: string }) => p.id === sub.user_id);
+      const authUser = authUsers.users.find((u: { id: string }) => u.id === sub.user_id);
       return {
         ...sub,
         full_name: profile?.full_name || 'Tanpa Nama',

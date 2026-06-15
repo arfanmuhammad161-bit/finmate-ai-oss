@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function GET() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+    const { supabaseAdmin } = auth;
 
     const { data: subs, error } = await supabaseAdmin
       .from('subscriptions')
@@ -18,7 +17,7 @@ export async function GET() {
     let monthlyCount = 0;
     let yearlyCount = 0;
 
-    (subs || []).forEach(s => {
+    (subs || []).forEach((s: { plan: string }) => {
       // Simplifikasi: anggap semua yang punya plan monthly/yearly sudah bayar.
       // Di sistem yang lebih kompleks, ini harusnya membaca dari tabel 'payments'
       if (s.plan === 'monthly') {

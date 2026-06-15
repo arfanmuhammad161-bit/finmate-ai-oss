@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { chatWithGemini } from '@/lib/gemini';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function POST(req: Request) {
   try {
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+
     const { title, message } = await req.json();
 
     if (!title && !message) {

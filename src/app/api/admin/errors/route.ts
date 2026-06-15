@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function GET() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+    const { supabaseAdmin } = auth;
 
     const { data: logs, error } = await supabaseAdmin
       .from('system_logs')
@@ -25,12 +24,11 @@ export async function GET() {
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+    const { supabaseAdmin } = auth;
 
     // Clear all resolved errors
     const { error } = await supabaseAdmin

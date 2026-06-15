@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export async function POST(req: Request) {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const auth = await verifyAdmin();
+    if (auth.error) return auth.error;
+    const { supabaseAdmin } = auth;
 
     const { title, message } = await req.json();
 
@@ -19,7 +18,7 @@ export async function POST(req: Request) {
     if (userError) throw userError;
 
     // Siapkan array notifikasi massal
-    const notifications = users.users.map(u => ({
+    const notifications = users.users.map((u: { id: string }) => ({
       user_id: u.id,
       title: title,
       message: message,
