@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Download, FileText, CalendarDays, CalendarIcon, SlidersHorizontal, Sparkles, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Download, FileText, CalendarDays, CalendarIcon, SlidersHorizontal, Sparkles, AlertCircle, CheckCircle2, Loader2, TrendingUp, TrendingDown, Flame, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
-import { Skeleton, StatsGridSkeleton } from '@/components/ui/Skeleton';
+import { Skeleton, StatsGridSkeleton, CardSkeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/PageHeader';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -295,7 +296,18 @@ export default function ReportsPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div className="space-y-2"><Skeleton className="h-7 w-48" /><Skeleton className="h-3.5 w-56" /></div>
+          <Skeleton className="h-10 w-36 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0,1,2].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+        </div>
+        <CardSkeleton className="h-96" />
+      </div>
+    );
   }
 
   const formatRupiah = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
@@ -399,66 +411,113 @@ export default function ReportsPage() {
       )}
 
       {/* Report Preview */}
-      <Card id="report-container" className="border-t-4 border-t-primary-500 shadow-lg bg-white">
-        <CardHeader className="text-center pb-8 border-b border-gray-100">
-          <CardTitle className="text-2xl">
-            Laporan Keuangan {activeTab === 'monthly' ? monthName : activeTab === 'yearly' ? `Tahun ${year}` : (customStart && customEnd ? `${customStart} s.d ${customEnd}` : 'Custom')}
-          </CardTitle>
-          <CardDescription>Berdasarkan transaksi riil Anda pada periode terpilih</CardDescription>
-        </CardHeader>
-        <CardContent className="p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            
+      <Card id="report-container" className="overflow-hidden border-none shadow-lg bg-white">
+        {/* Hero header with period */}
+        <div className="bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-600 text-white p-6 sm:p-8 relative overflow-hidden">
+          <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-secondary-400/30 blur-2xl" />
+          <div className="relative flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-primary-100/80 mb-1">Laporan Keuangan</div>
+              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                {activeTab === 'monthly' ? monthName : activeTab === 'yearly' ? `Tahun ${year}` : (customStart && customEnd ? `${customStart} → ${customEnd}` : 'Periode Custom')}
+              </h3>
+              <p className="text-sm text-primary-100 mt-1">Dari transaksi riil yang Anda catat</p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-xs uppercase tracking-wider text-primary-100/80 font-semibold">Sisa Bersih</div>
+              <div className={cn("text-3xl sm:text-4xl font-extrabold tabular-nums")}>{formatRupiah(summary.net)}</div>
+              <div className={cn("mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/15 backdrop-blur-sm")}>
+                {summary.net >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {summary.net >= 0 ? 'Surplus' : 'Defisit'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <CardContent className="p-6 sm:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+
             {/* Left Column: Summary & Charts */}
-            <div className="space-y-8">
+            <div className="space-y-7">
               <div>
-                <h3 className="text-lg font-bold text-text-main mb-4 border-b pb-2">Ringkasan Eksekutif</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-sm text-text-muted mb-1">Total Pemasukan</p>
-                    <p className="text-xl font-bold text-green-600">{formatRupiah(summary.income)}</p>
+                <h3 className="text-sm font-bold text-text-main mb-3 uppercase tracking-wider">Ringkasan</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-7 w-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                        <ArrowDownRight className="h-3.5 w-3.5" />
+                      </div>
+                      <p className="text-xs font-medium text-green-700">Pemasukan</p>
+                    </div>
+                    <p className="text-lg sm:text-xl font-bold text-green-700 tabular-nums">{formatRupiah(summary.income)}</p>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <p className="text-sm text-text-muted mb-1">Total Pengeluaran</p>
-                    <p className="text-xl font-bold text-red-600">{formatRupiah(summary.expense)}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 col-span-2">
-                    <p className="text-sm text-text-muted mb-1">Sisa Uang (Net)</p>
-                    <p className={cn("text-2xl font-bold", summary.net >= 0 ? "text-primary-600" : "text-red-600")}>
-                      {formatRupiah(summary.net)}
-                    </p>
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-100">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-7 w-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </div>
+                      <p className="text-xs font-medium text-red-700">Pengeluaran</p>
+                    </div>
+                    <p className="text-lg sm:text-xl font-bold text-red-700 tabular-nums">{formatRupiah(summary.expense)}</p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-text-main mb-4 border-b pb-2">Distribusi Pengeluaran</h3>
+                <h3 className="text-sm font-bold text-text-main mb-3 uppercase tracking-wider">Distribusi Pengeluaran</h3>
                 {pieData.length > 0 ? (
-                  <div className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: any) => `Rp ${Number(value).toLocaleString('id-ID')}`} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div>
+                    <div className="h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={85}
+                            paddingAngle={3}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: any) => `Rp ${Number(value).toLocaleString('id-ID')}`}
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px -2px rgba(0,0,0,0.12)' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* Custom legend list — lebih readable dari bawaan Recharts */}
+                    <div className="mt-3 space-y-1.5">
+                      {pieData.slice(0, 6).map((entry, i) => {
+                        const pct = summary.expense > 0 ? (entry.value / summary.expense) * 100 : 0;
+                        return (
+                          <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+                              <span className="font-medium text-text-main truncate">{entry.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-text-muted text-xs tabular-nums">{pct.toFixed(0)}%</span>
+                              <span className="font-bold text-text-main tabular-nums text-xs">{formatRupiah(entry.value)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center text-text-muted bg-gray-50 rounded-xl border border-dashed">
-                    Belum ada pengeluaran bulan ini
-                  </div>
+                  <EmptyState
+                    icon={<Flame className="h-6 w-6" />}
+                    title="Belum ada pengeluaran"
+                    description="Catat transaksi dulu untuk melihat distribusi pengeluaran."
+                    className="py-8"
+                  />
                 )}
               </div>
             </div>
@@ -536,33 +595,41 @@ export default function ReportsPage() {
 
           {/* Top Transactions Section */}
           {topTransactions.length > 0 && (
-            <div className="mt-12 pt-8 border-t border-gray-100 break-inside-avoid">
-              <h3 className="text-lg font-bold text-text-main mb-4">5 Pengeluaran Terbesar Bulan Ini</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-text-muted uppercase bg-gray-50 border-b border-border">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Deskripsi</th>
-                      <th className="px-4 py-3 font-medium">Kategori</th>
-                      <th className="px-4 py-3 font-medium text-right">Jumlah</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topTransactions.map((trx, idx) => (
-                      <tr key={idx} className="bg-white border-b border-border hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-text-main">{trx.description || 'Tanpa Keterangan'}</td>
-                        <td className="px-4 py-3 text-text-muted">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs">
-                            {trx.category_name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-red-600">
-                          {formatRupiah(trx.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="mt-10 pt-7 border-t border-gray-100 break-inside-avoid">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                  <Flame className="h-4 w-4" />
+                </div>
+                <h3 className="text-base font-bold text-text-main">5 Pengeluaran Terbesar</h3>
+              </div>
+              <div className="space-y-2">
+                {topTransactions.map((trx, idx) => {
+                  const pct = summary.expense > 0 ? (trx.amount / summary.expense) * 100 : 0;
+                  return (
+                    <div key={idx} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-50/60 hover:bg-gray-50 border border-gray-100 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold",
+                          idx === 0 ? "bg-red-100 text-red-700" : idx === 1 ? "bg-orange-100 text-orange-700" : idx === 2 ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
+                        )}>
+                          #{idx + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-text-main text-sm truncate">{trx.description || 'Tanpa Keterangan'}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-white border border-gray-200 text-text-muted">
+                              {trx.category_name}
+                            </span>
+                            <span className="text-[10px] text-text-muted tabular-nums">{pct.toFixed(1)}% dari total</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-red-600 text-sm sm:text-base tabular-nums">{formatRupiah(trx.amount)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
