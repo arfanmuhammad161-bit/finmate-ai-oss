@@ -9,6 +9,12 @@ export interface ReportData {
   net: number;
   categoryBreakdown: Record<string, number>;
   topTransactions: { description: string; category_name: string; amount: number; date?: string }[];
+  /** AI insights opsional — kalau ada, akan dirender di halaman 2 */
+  aiInsights?: {
+    worst_category_text?: string;
+    good_news_text?: string;
+    tips?: string[];
+  };
 }
 
 const formatRupiah = (n: number) => `Rp ${(n || 0).toLocaleString('id-ID')}`;
@@ -204,14 +210,115 @@ export function generateReportPdf(data: ReportData): Uint8Array {
     });
   }
 
-  // === FOOTER ===
-  const pageH = doc.internal.pageSize.height;
-  doc.setFontSize(7);
-  doc.setTextColor(148, 163, 184);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Laporan ini dibuat otomatis oleh FinMate AI', 15, pageH - 10);
-  doc.text('finmate-ai-brown.vercel.app', pageW - 15, pageH - 10, { align: 'right' });
+  // === AI INSIGHTS (halaman 2 kalau ada) ===
+  if (data.aiInsights && (data.aiInsights.worst_category_text || data.aiInsights.good_news_text || (data.aiInsights.tips && data.aiInsights.tips.length > 0))) {
+    doc.addPage();
+    // Mini gradient header halaman 2
+    const bandsP2 = 20;
+    const bandH2 = 25 / bandsP2;
+    for (let i = 0; i < bandsP2; i++) {
+      const t = i / bandsP2;
+      const r = Math.round(0x25 + (0x7c - 0x25) * t);
+      const g = Math.round(0x63 + (0x3a - 0x63) * t);
+      const b = Math.round(0xeb + (0xed - 0xeb) * t);
+      doc.setFillColor(r, g, b);
+      doc.rect(0, i * bandH2, pageW, bandH2 + 0.5, 'F');
+    }
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Analisis FinMate AI', 15, 17);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periode: ${data.periodLabel}`, 15, 22);
 
-  // Return as Uint8Array (compatible dengan Telegram sendDocument)
+    let y2 = 38;
+
+    // Card: Kategori Paling Boros
+    if (data.aiInsights.worst_category_text) {
+      // Card background
+      doc.setFillColor(255, 247, 237); // orange-50
+      doc.setDrawColor(254, 215, 170); // orange-200
+      doc.roundedRect(15, y2, pageW - 30, 28, 3, 3, 'FD');
+      // Accent stripe
+      doc.setFillColor(249, 115, 22); // orange-500
+      doc.roundedRect(15, y2, 1.5, 28, 0.5, 0.5, 'F');
+      // Label
+      doc.setFontSize(9);
+      doc.setTextColor(154, 52, 18); // orange-900
+      doc.setFont('helvetica', 'bold');
+      doc.text('KATEGORI PALING BOROS', 20, y2 + 7);
+      // Body text
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      doc.setFont('helvetica', 'normal');
+      const wrapped = doc.splitTextToSize(data.aiInsights.worst_category_text, pageW - 40);
+      doc.text(wrapped, 20, y2 + 14);
+      y2 += 34;
+    }
+
+    // Card: Kabar Baik
+    if (data.aiInsights.good_news_text) {
+      doc.setFillColor(240, 253, 244); // green-50
+      doc.setDrawColor(187, 247, 208); // green-200
+      doc.roundedRect(15, y2, pageW - 30, 28, 3, 3, 'FD');
+      doc.setFillColor(34, 197, 94); // green-500
+      doc.roundedRect(15, y2, 1.5, 28, 0.5, 0.5, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(20, 83, 45); // green-900
+      doc.setFont('helvetica', 'bold');
+      doc.text('KABAR BAIK', 20, y2 + 7);
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      doc.setFont('helvetica', 'normal');
+      const wrapped = doc.splitTextToSize(data.aiInsights.good_news_text, pageW - 40);
+      doc.text(wrapped, 20, y2 + 14);
+      y2 += 34;
+    }
+
+    // Tips list
+    if (data.aiInsights.tips && data.aiInsights.tips.length > 0) {
+      y2 += 4;
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TIPS HEMAT KHUSUS UNTUK ANDA', 15, y2);
+      doc.setLineWidth(0.2);
+      doc.setDrawColor(226, 232, 240);
+      doc.line(15, y2 + 2, pageW - 15, y2 + 2);
+      y2 += 10;
+
+      data.aiInsights.tips.forEach((tip, i) => {
+        // Bullet number badge
+        doc.setFillColor(37, 99, 235);
+        doc.circle(18, y2 - 1, 2.5, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(String(i + 1), 18, y2 + 0.5, { align: 'center' });
+
+        // Tip text
+        doc.setFontSize(10);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont('helvetica', 'normal');
+        const wrappedTip = doc.splitTextToSize(tip, pageW - 35);
+        doc.text(wrappedTip, 23, y2);
+        y2 += (wrappedTip.length * 4.5) + 4;
+      });
+    }
+  }
+
+  // === FOOTER tiap halaman ===
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  const pageH = doc.internal.pageSize.height;
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laporan ini dibuat otomatis oleh FinMate AI', 15, pageH - 10);
+    doc.text(`Hal. ${p}/${pageCount}  ·  finmate-ai-brown.vercel.app`, pageW - 15, pageH - 10, { align: 'right' });
+  }
+
   return new Uint8Array(doc.output('arraybuffer'));
 }

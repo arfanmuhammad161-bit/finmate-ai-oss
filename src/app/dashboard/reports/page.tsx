@@ -154,153 +154,54 @@ export default function ReportsPage() {
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
-
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
-      
-      const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.width;
-      
-      // Header
-      doc.setFillColor(59, 130, 246); // Primary blue
-      doc.rect(0, 0, pageWidth, 25, 'F');
-      
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`FINMATE AI - Laporan Keuangan`, 14, 17);
-      
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      const periodText = activeTab === 'monthly' ? monthName : activeTab === 'yearly' ? 'Tahun ' + year : (customStart && customEnd ? customStart + ' s/d ' + customEnd : 'Custom');
-      doc.text(`Periode: ${periodText}`, 14, 35);
-      doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}`, 14, 42);
-      
-      // Ringkasan Section
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Ringkasan Keuangan`, 14, 55);
-      
-      autoTable(doc, {
-        startY: 60,
-        head: [['Total Pemasukan', 'Total Pengeluaran', 'Sisa Saldo (Net)']],
-        body: [[
-          formatRupiah(summary.income), 
-          formatRupiah(summary.expense), 
-          formatRupiah(summary.net)
-        ]],
-        theme: 'grid',
-        headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' },
-        bodyStyles: { fontStyle: 'bold', fontSize: 12 },
-        columnStyles: {
-          0: { textColor: [22, 163, 74] }, // Green
-          1: { textColor: [220, 38, 38] }, // Red
-          2: { textColor: summary.net >= 0 ? [37, 99, 235] : [220, 38, 38] } // Blue or Red
-        }
-      });
-      
-      let finalY = (doc as any).lastAutoTable.finalY + 15;
-      
-      // Kategori Pengeluaran Section
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(50, 50, 50);
-      doc.text(`Rincian Pengeluaran per Kategori`, 14, finalY);
-      
-      const catBody = pieData.map(p => [p.name, formatRupiah(p.value)]);
-      
-      autoTable(doc, {
-        startY: finalY + 5,
-        head: [['Kategori', 'Total Pengeluaran']],
-        body: catBody.length > 0 ? catBody : [['Belum ada pengeluaran', '-']],
-        theme: 'striped',
-        headStyles: { fillColor: [59, 130, 246] },
-      });
-      
-      finalY = (doc as any).lastAutoTable.finalY + 15;
-      
-      // 5 Pengeluaran Terbesar Section
-      if (topTransactions.length > 0) {
-        if (finalY > 220) {
-          doc.addPage();
-          finalY = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`5 Pengeluaran Terbesar`, 14, finalY);
-        
-        const txBody = topTransactions.map(t => [
-          t.date,
-          t.description || 'Tanpa Keterangan', 
-          t.category_name, 
-          formatRupiah(t.amount)
-        ]);
-        
-        autoTable(doc, {
-          startY: finalY + 5,
-          head: [['Tanggal', 'Deskripsi', 'Kategori', 'Jumlah']],
-          body: txBody,
-          theme: 'grid',
-          headStyles: { fillColor: [220, 38, 38] },
-          styles: { overflow: 'linebreak', cellWidth: 'wrap' },
-          columnStyles: {
-            1: { cellWidth: 'auto' }, // Allow description to wrap safely
-            3: { halign: 'right', fontStyle: 'bold' }
-          }
-        });
-        
-        finalY = (doc as any).lastAutoTable.finalY + 15;
+      const { generateReportPdf } = await import('@/lib/generateReportPdf');
+
+      const periodLabel = activeTab === 'monthly'
+        ? monthName
+        : activeTab === 'yearly'
+          ? `Tahun ${year}`
+          : (customStart && customEnd ? `${customStart} → ${customEnd}` : 'Periode Custom');
+
+      // Ambil nama user dari Supabase
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      let userName = 'User FinMate';
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+        userName = profile?.full_name || user.email?.split('@')[0] || 'User FinMate';
       }
 
-      // AI Analysis Section
-      if (aiReport) {
-        if (finalY > 200) {
-          doc.addPage();
-          finalY = 20;
-        }
+      const pdfBytes = generateReportPdf({
+        userName,
+        periodLabel,
+        income: summary.income,
+        expense: summary.expense,
+        net: summary.net,
+        categoryBreakdown,
+        topTransactions: topTransactions.map(t => ({
+          description: t.description || '',
+          category_name: t.category_name || '',
+          amount: Number(t.amount),
+          date: t.date,
+        })),
+        aiInsights: aiReport ? {
+          worst_category_text: aiReport.worst_category_text,
+          good_news_text: aiReport.good_news_text,
+          tips: aiReport.tips,
+        } : undefined,
+      });
 
-        // AI Header Background
-        doc.setFillColor(240, 249, 255);
-        doc.rect(14, finalY, pageWidth - 28, 8, 'F');
-        
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(3, 105, 161);
-        doc.text(`Analisis AI FinMate`, 16, finalY + 6);
-        
-        finalY += 15;
-        doc.setFontSize(11);
-        doc.setTextColor(50, 50, 50);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Kategori Paling Boros:`, 14, finalY);
-        doc.setFont('helvetica', 'normal');
-        const worstSplit = doc.splitTextToSize(aiReport.worst_category_text || '-', pageWidth - 28);
-        doc.text(worstSplit, 14, finalY + 6);
-        finalY += (worstSplit.length * 6) + 6;
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Kabar Baik:`, 14, finalY);
-        doc.setFont('helvetica', 'normal');
-        const goodSplit = doc.splitTextToSize(aiReport.good_news_text || '-', pageWidth - 28);
-        doc.text(goodSplit, 14, finalY + 6);
-        finalY += (goodSplit.length * 6) + 6;
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text(`💡 Tips Hemat Khusus Untuk Anda:`, 14, finalY);
-        doc.setFont('helvetica', 'normal');
-        let tipY = finalY + 6;
-        aiReport.tips?.forEach((tip: string) => {
-          const tipSplit = doc.splitTextToSize(`• ${tip}`, pageWidth - 28);
-          doc.text(tipSplit, 14, tipY);
-          tipY += (tipSplit.length * 6) + 2;
-        });
-      }
-      
-      doc.save(`Laporan_FinMate_${monthName.replace(/ /g, '_')}.pdf`);
+      // Trigger download di browser
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `FinMate_${periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Gagal generate PDF:', e);
       toast.error('Maaf, terjadi kesalahan saat membuat PDF.');
