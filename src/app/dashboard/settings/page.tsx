@@ -60,12 +60,13 @@ function SettingsContent() {
   });
 
   const NOTIF_CONFIG = [
-    { key: 'budgetAlert', label: 'Notifikasi Budget Hampir Habis', desc: 'Dapatkan peringatan saat budget kategori mencapai 80%' },
-    { key: 'dailySummary', label: 'Ringkasan Harian', desc: 'Laporan singkat pengeluaran hari ini via Telegram' },
-    { key: 'weeklySummary', label: 'Ringkasan Mingguan', desc: 'Analisis keuangan setiap hari Senin pagi' },
-    { key: 'trialReminder', label: 'Reminder Trial Berakhir', desc: 'Pengingat 7, 3, dan 1 hari sebelum trial habis' },
-    { key: 'aiTips', label: 'Tips Keuangan AI', desc: 'Saran dan tips hemat personal dari AI' },
+    { key: 'budgetAlert', testType: 'budget', label: 'Notifikasi Budget Hampir Habis', desc: 'Peringatan saat budget kategori mencapai 80%' },
+    { key: 'dailySummary', testType: 'daily', label: 'Ringkasan Harian', desc: 'Laporan singkat pengeluaran hari ini via Telegram' },
+    { key: 'weeklySummary', testType: 'weekly', label: 'Ringkasan Mingguan', desc: 'Analisis keuangan setiap hari Senin pagi' },
+    { key: 'trialReminder', testType: 'trial', label: 'Reminder Trial Berakhir', desc: 'Pengingat 7, 3, dan 1 hari sebelum trial habis' },
+    { key: 'aiTips', testType: 'tips', label: 'Tips Keuangan AI', desc: 'Saran personal dari AI setiap Senin' },
   ] as const;
+  const [testingNotif, setTestingNotif] = useState<string | null>(null);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -906,41 +907,100 @@ function SettingsContent() {
             <Card>
               <CardHeader>
                 <CardTitle>Pengaturan Notifikasi</CardTitle>
-                <CardDescription>Pilih notifikasi yang ingin Anda terima.</CardDescription>
+                <CardDescription>
+                  Notif otomatis dikirim ke Telegram setiap hari pukul 19:00 WIB.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {NOTIF_CONFIG.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div>
-                      <p className="font-medium text-text-main">{item.label}</p>
-                      <p className="text-sm text-text-muted">{item.desc}</p>
+              <CardContent className="space-y-4">
+                {!telegramConnected && (
+                  <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+                    <div className="h-9 w-9 shrink-0 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Bot className="h-4 w-4" />
                     </div>
-                    <div
-                      onClick={async () => {
-                        const newSettings = { ...notifSettings, [item.key]: !notifSettings[item.key as keyof typeof notifSettings] };
-                        setNotifSettings(newSettings);
-                        try {
-                          await fetch('/api/user/settings', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ settings: newSettings })
-                          });
-                        } catch (e) {
-                          console.error('Gagal menyimpan pengaturan');
-                        }
-                      }}
-                      className={cn(
-                        "relative h-6 w-11 rounded-full transition-colors cursor-pointer",
-                        notifSettings[item.key as keyof typeof notifSettings] ? "bg-primary-600" : "bg-gray-200"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all",
-                        notifSettings[item.key as keyof typeof notifSettings] ? "left-6" : "left-1"
-                      )} />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-amber-900">Telegram belum terhubung</p>
+                      <p className="text-xs text-amber-800/80 mt-0.5">
+                        Notif tidak akan terkirim sampai Anda hubungkan Telegram dulu.
+                      </p>
+                      <Button size="sm" variant="outline" className="mt-2 bg-white border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => router.push('/dashboard/settings?tab=telegram')}>
+                        Hubungkan sekarang →
+                      </Button>
                     </div>
                   </div>
-                ))}
+                )}
+
+                <div className="divide-y divide-border">
+                  {NOTIF_CONFIG.map((item, i) => {
+                    const isOn = notifSettings[item.key as keyof typeof notifSettings];
+                    return (
+                      <div key={i} className="flex items-start sm:items-center justify-between gap-3 py-3 flex-col sm:flex-row">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-text-main text-sm">{item.label}</p>
+                          <p className="text-xs text-text-muted mt-0.5">{item.desc}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={!telegramConnected || testingNotif === item.testType}
+                            onClick={async () => {
+                              setTestingNotif(item.testType);
+                              try {
+                                const res = await fetch('/api/notifications/test', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ type: item.testType }),
+                                });
+                                const data = await res.json();
+                                if (!res.ok) {
+                                  toast.error(data.error || 'Gagal kirim test');
+                                } else {
+                                  toast.success(`Test ${data.sent} terkirim ke Telegram!`);
+                                }
+                              } catch {
+                                toast.error('Gagal kirim test notifikasi');
+                              } finally {
+                                setTestingNotif(null);
+                              }
+                            }}
+                            className="h-7 text-[11px] px-2.5"
+                          >
+                            {testingNotif === item.testType ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Test'}
+                          </Button>
+                          <div
+                            onClick={async () => {
+                              const newSettings = { ...notifSettings, [item.key]: !isOn };
+                              setNotifSettings(newSettings);
+                              try {
+                                await fetch('/api/user/settings', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ settings: newSettings })
+                                });
+                              } catch (e) {
+                                console.error('Gagal menyimpan pengaturan');
+                              }
+                            }}
+                            className={cn(
+                              "relative h-6 w-11 rounded-full transition-colors cursor-pointer shrink-0",
+                              isOn ? "bg-gradient-to-r from-primary-500 to-secondary-500" : "bg-gray-200"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all",
+                              isOn ? "left-6" : "left-1"
+                            )} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-900 leading-relaxed">
+                  💡 <strong>Tips diagnose:</strong> klik tombol <strong>Test</strong> di samping setiap notif. Kalau Telegram terima pesan = sistem jalan. Kalau tidak ada notif otomatis di jam 19:00 WIB, kemungkinan karena kondisi belum terpenuhi (contoh: ringkasan harian skip kalau belum catat transaksi hari itu).
+                </div>
               </CardContent>
             </Card>
           )}
