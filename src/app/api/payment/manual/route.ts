@@ -83,19 +83,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Gagal mencatat pembayaran' }, { status: 500 });
     }
 
-    // Jika gratis 100%, langsung aktifkan paket dan tambah used_count kupon
-    if (isFree && validCoupon) {
-      // 1. Update kupon used_count
+    // Increment used_count untuk SETIAP kupon valid yang dipakai (cegah pemakaian tak terbatas
+    // pada kupon diskon parsial yang dulu hanya di-increment saat gratis 100%)
+    if (validCoupon) {
       await supabaseAdmin
         .from('coupons')
         .update({ used_count: validCoupon.used_count + 1 })
         .eq('id', validCoupon.id);
+    }
 
-      // 2. Aktifkan subscription via upsert (aman untuk user baru maupun lama)
+    // Jika gratis 100%, langsung aktifkan paket
+    if (isFree && validCoupon) {
       const now = new Date();
       if (plan === 'monthly') now.setMonth(now.getMonth() + 1);
       else if (plan === 'yearly') now.setFullYear(now.getFullYear() + 1);
-      
+
       const { error: subError } = await supabaseAdmin
         .from('subscriptions')
         .upsert({
