@@ -16,6 +16,19 @@ function upgradeKeyboard() {
   }
 }
 
+/** Menu tombol persisten di bawah input chat — biar user gak perlu hafal command */
+function mainMenuKeyboard() {
+  return {
+    keyboard: [
+      [{ text: '📊 Laporan' }, { text: '💰 Saldo' }],
+      [{ text: '📄 Laporan PDF' }, { text: '❓ Bantuan' }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: 'Ketik transaksi atau pilih menu...',
+  }
+}
+
 // Helper untuk fetch file dari Telegram
 async function getTelegramFileBase64(fileId: string): Promise<{ base64: string, mimeType: string }> {
   const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
@@ -97,12 +110,22 @@ export async function POST(request: NextRequest) {
     const isPhoto = !!message.photo && message.photo.length > 0
     let text = (message.text || message.caption || '').trim()
 
+    // Map tombol menu (teks) ke command supaya handler di bawah tetap jalan
+    const buttonMap: Record<string, string> = {
+      '📊 Laporan': '/laporan',
+      '💰 Saldo': '/saldo',
+      '📄 Laporan PDF': '/pdf',
+      '❓ Bantuan': '/help',
+    }
+    if (buttonMap[text]) text = buttonMap[text]
+
     // Handle perintah Start
     if (text.startsWith('/start')) {
       return NextResponse.json({
         method: 'sendMessage',
         chat_id: chatId,
-        text: `🤖 Halo! Saya FinMate AI Bot.\n\nUntuk menghubungkan akun Anda, masuk ke web app dan dapatkan kode verifikasi di menu Pengaturan > Telegram Bot.\n\nKirim kode verifikasi Anda: FIN-XXXXXX`
+        text: `🤖 *Halo! Saya FinMate AI Bot.*\n\nUntuk menghubungkan akun:\n1️⃣ Buka aplikasi web FinMate\n2️⃣ Masuk ke *Pengaturan → Telegram Bot*\n3️⃣ Salin kode verifikasi (format: FIN-XXXXXX)\n4️⃣ Kirim kode itu ke chat ini\n\nKirim kode verifikasi Anda sekarang 👇`,
+        parse_mode: 'Markdown',
       })
     }
 
@@ -128,7 +151,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           method: 'sendMessage',
           chat_id: chatId,
-          text: `✅ Akun Anda berhasil terhubung!\n\nSekarang Anda bisa mulai mencatat transaksi dengan cerdas.\n\nContoh:\n💬 Teks: "makan siang 35rb"\n🎤 Voice Note: "tadi beli bensin 50 ribu"\n📸 Foto struk belanja\n\nKetik /help untuk panduan lengkap.`
+          text: `✅ *Akun Anda berhasil terhubung!*\n\nSekarang Anda bisa mulai mencatat keuangan:\n\n💬 *Teks:* ketik "makan siang 35rb"\n🎤 *Voice:* rekam "tadi beli bensin 50 ribu"\n📸 *Foto struk:* AI baca otomatis\n\nGunakan *menu tombol di bawah* untuk akses cepat 👇`,
+          parse_mode: 'Markdown',
+          reply_markup: mainMenuKeyboard(),
         })
       } else {
         return NextResponse.json({
@@ -302,23 +327,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (text === '/help' || text === '/start') {
+    if (text === '/help') {
       return NextResponse.json({
         method: 'sendMessage',
         chat_id: chatId,
         text: `🤖 *FinMate AI Bot — Panduan*\n\n` +
-          `*Catat Transaksi:*\n` +
-          `💬 Ketik: "makan siang 35rb"\n` +
-          `💬 Ketik: "terima gaji 5jt"\n` +
-          `📸 Kirim foto struk → AI baca otomatis\n` +
-          `🎤 Kirim voice note → ditranskripsi & dicatat\n\n` +
-          `*Perintah Khusus:*\n` +
-          `/laporan - Ringkasan bulan ini\n` +
-          `/pdf - Download laporan PDF bulan ini\n` +
-          `/saldo - Cek saldo saat ini\n` +
-          `/help - Panduan penggunaan\n\n` +
-          `_(ID Telegram Anda: \`${chatId}\`)_`,
-        parse_mode: 'Markdown'
+          `*✍️ Cara Catat Transaksi:*\n` +
+          `💬 Ketik bebas: _"makan siang 35rb"_\n` +
+          `💬 Pemasukan: _"terima gaji 5jt"_\n` +
+          `📸 Kirim *foto struk* → AI baca otomatis\n` +
+          `🎤 Kirim *voice note* → langsung dicatat\n\n` +
+          `*📋 Menu Cepat (tombol di bawah):*\n` +
+          `📊 Laporan — ringkasan bulan ini\n` +
+          `📄 Laporan PDF — file PDF rapi\n` +
+          `💰 Saldo — cek saldo saat ini\n` +
+          `❓ Bantuan — panduan ini\n\n` +
+          `_Tinggal tap tombol, gak perlu hafal perintah!_`,
+        parse_mode: 'Markdown',
+        reply_markup: mainMenuKeyboard(),
       })
     }
 

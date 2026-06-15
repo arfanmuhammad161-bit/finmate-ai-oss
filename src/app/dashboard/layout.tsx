@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Sidebar, SidebarItem } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { Button } from '@/components/ui/Button';
+import { TelegramOnboarding } from '@/components/TelegramOnboarding';
 import { createClient } from '@/lib/supabase/client';
 import {
   LayoutDashboard, Wallet, PieChart, Target, FileText, Bot, Settings, Shield, Lock, Crown
@@ -114,7 +115,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen bg-background overflow-hidden relative">
-      <Sidebar 
+      {!userMeta?.isAdmin && <TelegramOnboarding />}
+      <Sidebar
         items={activeSidebarItems} 
         role={userMeta?.isAdmin ? 'admin' : 'user'} 
         userMeta={userMeta || undefined} 
