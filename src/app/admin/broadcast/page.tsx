@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { MessageSquare, Send, Bell, Loader2, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Send, Bell, Loader2, CheckCircle2, Smartphone } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 
@@ -25,11 +25,15 @@ export default function AdminBroadcastPage() {
       });
       
       if (res.ok) {
+        const data = await res.json().catch(() => ({} as any));
         setSuccess(true);
         setTitle('');
         setMessage('');
-        toast.success('Broadcast berhasil dikirim ke seluruh user.');
-        setTimeout(() => setSuccess(false), 3000);
+        const tgInfo = typeof data.telegramSent === 'number'
+          ? ` In-app: ${data.count} user · Telegram: ${data.telegramSent} terkirim${data.telegramFailed > 0 ? `, ${data.telegramFailed} gagal` : ''}.`
+          : '';
+        toast.success(`Broadcast terkirim!${tgInfo}`);
+        setTimeout(() => setSuccess(false), 5000);
       } else {
         toast.error('Gagal mengirim broadcast. Silakan coba lagi.');
       }
@@ -62,11 +66,19 @@ export default function AdminBroadcastPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {success && (
-                <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <p className="font-medium">Broadcast berhasil dikirim ke seluruh user!</p>
+                <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Broadcast berhasil dikirim!</p>
+                    <p className="text-xs text-green-700/80 mt-0.5">Pesan masuk ke notif in-app + chat Telegram user yang sudah terhubung.</p>
+                  </div>
                 </div>
               )}
+
+              <div className="bg-blue-50 border border-blue-100 text-blue-900 p-3 rounded-xl flex items-start gap-2 text-xs">
+                <Send className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>Broadcast akan terkirim ke <strong>2 tempat sekaligus</strong>: notif lonceng web app + chat Telegram user yang sudah connect bot.</span>
+              </div>
               
               <div className="space-y-2">
                 <label className="text-sm font-medium text-text-main">Judul Notifikasi</label>

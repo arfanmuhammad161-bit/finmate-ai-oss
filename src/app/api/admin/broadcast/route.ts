@@ -57,7 +57,54 @@ export async function POST(req: Request) {
       console.warn('Gagal mencatat ke system_logs', e);
     }
 
-    return NextResponse.json({ success: true, count: notifications.length });
+    // === Kirim juga ke Telegram untuk user yang sudah connect ===
+    const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+    let telegramSent = 0;
+    let telegramFailed = 0;
+
+    if (token) {
+      const { data: tgProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('telegram_id')
+        .not('telegram_id', 'is', null);
+
+      const telegramText = `📢 *${title}*\n\n${message}`;
+
+      for (const p of tgProfiles || []) {
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: p.telegram_id,
+              text: telegramText,
+              parse_mode: 'Markdown',
+            }),
+          });
+          if (res.ok) {
+            telegramSent++;
+          } else {
+            // Retry tanpa Markdown kalau format invalid
+            const retry = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: p.telegram_id, text: telegramText }),
+            });
+            if (retry.ok) telegramSent++;
+            else telegramFailed++;
+          }
+        } catch {
+          telegramFailed++;
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: notifications.length,
+      telegramSent,
+      telegramFailed,
+    });
   } catch (error: any) {
     console.error('API Admin Broadcast Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

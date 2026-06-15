@@ -113,8 +113,8 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReportData(); }, [fetchReportData]);
 
-  const generateAIReport = async () => {
-    if (Object.keys(categoryBreakdown).length === 0) return; // No expenses
+  const generateAIReport = useCallback(async (catBreakdown: Record<string, number>, sum: typeof summary) => {
+    if (Object.keys(catBreakdown).length === 0) return;
     setGeneratingAi(true);
     setAiError(null);
     try {
@@ -122,21 +122,35 @@ export default function ReportsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          income: summary.income,
-          expense: summary.expense,
-          categoryBreakdown
+          income: sum.income,
+          expense: sum.expense,
+          categoryBreakdown: catBreakdown,
         })
       });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'AI lagi sibuk. Coba 1 menit lagi.');
+        }
+        throw new Error(`API error: ${res.status}`);
+      }
       const data = await res.json();
       setAiReport(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setAiError('Gagal menghasilkan analisis AI. Silakan coba lagi nanti.');
+      setAiError(e.message || 'Gagal menghasilkan analisis AI. Silakan coba lagi.');
     } finally {
       setGeneratingAi(false);
     }
-  };
+  }, []);
+
+  // AUTO trigger analisis saat data tersedia (tidak ada tombol manual lagi)
+  useEffect(() => {
+    if (!loading && Object.keys(categoryBreakdown).length > 0 && !aiReport && !generatingAi && !aiError) {
+      generateAIReport(categoryBreakdown, summary);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, categoryBreakdown]);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -522,72 +536,101 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Right Column: AI Insights */}
+            {/* Right Column: AI Insights — AUTO fetch saat data tersedia */}
             <div className="space-y-6">
-              <div className="bg-gradient-to-br from-primary-50 to-secondary-50 p-6 rounded-2xl border border-primary-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-primary-900 flex items-center">
-                    <Sparkles className="h-5 w-5 mr-2 text-primary-600" />
-                    Analisis FinMate AI
-                  </h3>
-                  {!aiReport && pieData.length > 0 && (
-                    <Button variant="gradient" size="sm" onClick={generateAIReport} disabled={generatingAi}>
-                      {generatingAi ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                      {generatingAi ? 'Menganalisis...' : 'Mulai Analisis'}
-                    </Button>
-                  )}
+              <div className="bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6 rounded-2xl border border-primary-100">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center shadow-sm">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <h3 className="font-bold text-primary-900">Analisis FinMate AI</h3>
+                  {generatingAi && <span className="text-[10px] uppercase tracking-wider bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-bold">Menganalisis...</span>}
                 </div>
-                
-                {aiReport ? (
-                  <div className="space-y-4">
+
+                {generatingAi ? (
+                  <div className="space-y-3">
+                    <div className="flex gap-3 bg-white/60 p-3 rounded-xl border border-white">
+                      <Skeleton className="h-5 w-5 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3 w-32" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-4/5" />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 bg-white/60 p-3 rounded-xl border border-white">
+                      <Skeleton className="h-5 w-5 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                      </div>
+                    </div>
+                  </div>
+                ) : aiReport ? (
+                  <div className="space-y-3">
                     <div className="flex items-start gap-3 bg-white/60 p-3 rounded-xl border border-white">
                       <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-semibold text-text-main text-sm">Kategori Paling Boros</p>
-                        <p className="text-sm text-text-muted mt-1">{aiReport.worst_category_text}</p>
+                        <p className="text-sm text-text-muted mt-1 leading-relaxed">{aiReport.worst_category_text}</p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-start gap-3 bg-white/60 p-3 rounded-xl border border-white">
                       <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-semibold text-text-main text-sm">Kabar Baik</p>
-                        <p className="text-sm text-text-muted mt-1">{aiReport.good_news_text}</p>
+                        <p className="text-sm text-text-muted mt-1 leading-relaxed">{aiReport.good_news_text}</p>
                       </div>
                     </div>
                   </div>
                 ) : aiError ? (
-                  <div className="flex items-start gap-3 bg-red-50 p-4 rounded-xl border border-red-200">
-                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-red-800 text-sm">Gagal Menganalisis</p>
-                      <p className="text-sm text-red-700 mt-1">{aiError}</p>
-                      <Button variant="ghost" size="sm" className="mt-2 text-red-700 hover:text-red-900 hover:bg-red-100 px-0" onClick={generateAIReport}>
-                        Coba Lagi
-                      </Button>
+                  <div className="bg-red-50/80 backdrop-blur-sm p-3.5 rounded-xl border border-red-200">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-red-800 text-sm">Gagal menganalisis</p>
+                        <p className="text-xs text-red-700 mt-0.5 leading-relaxed">{aiError}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-7 text-[11px] border-red-300 text-red-700 hover:bg-red-100"
+                          onClick={() => { setAiError(null); generateAIReport(categoryBreakdown, summary); }}
+                        >
+                          <Loader2 className={cn("h-3 w-3 mr-1", generatingAi && "animate-spin")} />
+                          Coba lagi
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-6 text-primary-700/60 text-sm">
-                    {pieData.length > 0 
-                      ? "Klik tombol di atas untuk melihat insight spesifik berdasarkan pengeluaran Anda." 
-                      : "Catat pengeluaran terlebih dahulu agar AI dapat menganalisis keuangan Anda."}
+                    Catat pengeluaran terlebih dahulu agar AI bisa menganalisis keuangan Anda.
                   </div>
                 )}
               </div>
 
-              <div className="bg-accent-50 p-6 rounded-2xl border border-accent-100">
-                <h3 className="font-bold text-accent-900 mb-3">💡 Tips Hemat Bulan Ini</h3>
-                {aiReport ? (
-                  <ul className="space-y-2 text-sm text-accent-800 list-disc list-inside">
-                    {aiReport.tips?.map((tip: string, i: number) => (
-                      <li key={i}>{tip}</li>
+              <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-6 rounded-2xl border border-orange-100">
+                <h3 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+                  <span className="text-lg">💡</span>Tips Hemat Bulan Ini
+                </h3>
+                {generatingAi ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-11/12" />
+                    <Skeleton className="h-3 w-4/5" />
+                  </div>
+                ) : aiReport?.tips ? (
+                  <ul className="space-y-2 text-sm text-orange-900/90">
+                    {aiReport.tips.map((tip: string, i: number) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-orange-500 shrink-0">•</span>
+                        <span className="leading-relaxed">{tip}</span>
+                      </li>
                     ))}
                   </ul>
                 ) : (
-                  <ul className="space-y-2 text-sm text-accent-800/60 list-disc list-inside">
-                    <li>AI akan membuatkan tips khusus setelah Anda memulai analisis.</li>
-                  </ul>
+                  <p className="text-sm text-orange-900/60 leading-relaxed">Tips otomatis dibuatkan saat ada data pengeluaran.</p>
                 )}
               </div>
             </div>
