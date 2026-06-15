@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { Type, Schema } from '@google/genai';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit';
+import { getActiveGeminiAI, tierForPlan, rotateGeminiKey } from '@/lib/gemini';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const ADMIN_EMAIL = 'arfanmuhammad161@gmail.com';
 
 export const maxDuration = 60; // Max duration for Vercel Hobby
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: rateCheck.reason || 'Rate limit tercapai.' }, { status: 429 });
     }
 
+    const tier = tierForPlan(isAdmin ? 'admin' : sub?.plan);
     const data = await req.json();
     const { income, expense, categoryBreakdown } = data;
 
@@ -87,16 +88,34 @@ export async function POST(req: Request) {
       }
     }
 
-    // Fallback: Panggil Gemini secara lokal
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.2,
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema,
+    // Fallback: Panggil Gemini secara lokal dengan multi-key rotation (free) atau paid key (Pro)
+    let response: any;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        const ai = getActiveGeminiAI(tier);
+        response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            temperature: 0.2,
+            responseMimeType: 'application/json',
+            responseSchema: responseSchema,
+          }
+        });
+        break;
+      } catch (err: any) {
+        retries--;
+        if (retries === 0) throw err;
+        // Kalau 429/quota → rotate ke key berikutnya
+        if (err.message?.includes('429') || err.message?.includes('exceeded') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+          rotateGeminiKey();
+        } else {
+          // Error lain, kasih waktu 1 detik
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
-    });
+    }
 
     let result;
     try {
@@ -107,7 +126,7 @@ export async function POST(req: Request) {
       console.error("Failed to parse JSON:", e, response.text);
       throw new Error("Format balasan AI tidak valid");
     }
-    
+
     return NextResponse.json(result);
 
   } catch (error: any) {
