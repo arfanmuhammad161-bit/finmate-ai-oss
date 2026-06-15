@@ -1,12 +1,38 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI, Type, Schema } from '@google/genai';
+import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ADMIN_EMAIL = 'arfanmuhammad161@gmail.com';
 
 export const maxDuration = 60; // Max duration for Vercel Hobby
 
 export async function POST(req: Request) {
   try {
+    // Auth + rate limit
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const isAdmin = user.email?.toLowerCase().trim() === ADMIN_EMAIL;
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: sub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('plan')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle();
+    const rateCheck = await checkAiRateLimit(supabaseAdmin, user.id, configForPlan(sub?.plan), { skip: isAdmin });
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: rateCheck.reason || 'Rate limit tercapai.' }, { status: 429 });
+    }
+
     const data = await req.json();
     const { income, expense, categoryBreakdown } = data;
 

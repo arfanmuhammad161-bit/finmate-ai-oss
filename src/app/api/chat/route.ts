@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { chatWithGemini } from '@/lib/gemini'
+import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit'
+
+const ADMIN_EMAIL = 'arfanmuhammad161@gmail.com'
 
 export const maxDuration = 60; // Max duration for Vercel Hobby
 
@@ -18,6 +22,32 @@ export async function POST(request: NextRequest) {
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Invalid messages' }, { status: 400 })
+    }
+
+    // Rate limit cek SEBELUM panggil AI
+    const isAdmin = user.email?.toLowerCase().trim() === ADMIN_EMAIL
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: sub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('plan')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    const rateCheck = await checkAiRateLimit(
+      supabaseAdmin,
+      user.id,
+      configForPlan(sub?.plan),
+      { skip: isAdmin }
+    )
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: rateCheck.reason || 'Rate limit tercapai.' },
+        { status: 429 }
+      )
     }
 
     // Ambil profil user untuk memanggil nama
