@@ -64,6 +64,15 @@ export default function AIAssistantPage() {
 
       const data = await response.json();
 
+      // 402 — trial/langganan habis
+      if (response.status === 402) {
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `🔒 **${data.error || 'Masa aktif Anda berakhir.'}**\n\n[**Upgrade ke Pro sekarang →**](/dashboard/settings?tab=subscription)`,
+        }]);
+        return;
+      }
+
       // Rate limit 429 — tampilkan pesan ramah + CTA upgrade
       if (response.status === 429) {
         const upgradeHint = data.upgradeUrl

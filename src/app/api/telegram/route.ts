@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { handleTelegramChatWithGemini, rotateGeminiKey, getKeysCount, tierForPlan, UserTier } from '@/lib/gemini'
 import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit'
+import { checkUserAccess } from '@/lib/checkAccess'
 
 const UPGRADE_URL = 'https://finmate-ai-brown.vercel.app/dashboard/settings?tab=subscription'
 
@@ -333,6 +334,18 @@ export async function POST(request: NextRequest) {
 
       const isAdminUser = chatId.toString() === process.env.ADMIN_TELEGRAM_ID
       const tier: UserTier = isAdminUser ? 'paid' : tierForPlan(sub?.plan)
+
+      // ENFORCEMENT: blokir kalau trial/langganan habis
+      const access = await checkUserAccess(supabaseAdmin, profile.id, isAdminUser ? 'arfanmuhammad161@gmail.com' : null)
+      if (!access.hasAccess) {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `🔒 *${access.reason}*\n\nUpgrade ke Pro untuk lanjut mencatat keuangan via bot.\n\nBuka aplikasi → Pengaturan → Langganan.`,
+          parse_mode: 'Markdown',
+          reply_markup: upgradeKeyboard(),
+        })
+      }
 
       const rateCheck = await checkAiRateLimit(
         supabaseAdmin,

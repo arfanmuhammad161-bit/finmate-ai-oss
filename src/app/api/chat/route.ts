@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { chatWithGemini, tierForPlan } from '@/lib/gemini'
 import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit'
+import { checkUserAccess } from '@/lib/checkAccess'
 
 const ADMIN_EMAIL = 'arfanmuhammad161@gmail.com'
 const UPGRADE_URL = 'https://finmate-ai-brown.vercel.app/dashboard/settings?tab=subscription'
@@ -37,6 +38,19 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('status', 'active')
       .maybeSingle()
+
+    // ENFORCEMENT: blokir kalau trial/langganan habis
+    const access = await checkUserAccess(supabaseAdmin, user.id, user.email)
+    if (!access.hasAccess) {
+      return NextResponse.json(
+        {
+          error: `${access.reason} Upgrade ke Pro untuk lanjut pakai AI Assistant.`,
+          expired: true,
+          upgradeUrl: UPGRADE_URL,
+        },
+        { status: 402 } // 402 Payment Required
+      )
+    }
 
     const plan = sub?.plan
     const tier = tierForPlan(isAdmin ? 'admin' : plan)
