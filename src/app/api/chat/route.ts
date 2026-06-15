@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { chatWithGemini } from '@/lib/gemini'
+import { chatWithGemini, tierForPlan } from '@/lib/gemini'
 import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit'
 
 const ADMIN_EMAIL = 'arfanmuhammad161@gmail.com'
+const UPGRADE_URL = 'https://finmate-ai-brown.vercel.app/dashboard/settings?tab=subscription'
 
 export const maxDuration = 60; // Max duration for Vercel Hobby
 
@@ -37,15 +38,23 @@ export async function POST(request: NextRequest) {
       .eq('status', 'active')
       .maybeSingle()
 
+    const plan = sub?.plan
+    const tier = tierForPlan(isAdmin ? 'admin' : plan)
     const rateCheck = await checkAiRateLimit(
       supabaseAdmin,
       user.id,
-      configForPlan(sub?.plan),
+      configForPlan(plan),
       { skip: isAdmin }
     )
     if (!rateCheck.allowed) {
+      // Pesan ramah + CTA upgrade kalau user masih Trial
+      const isOnFreeTier = tier === 'free'
       return NextResponse.json(
-        { error: rateCheck.reason || 'Rate limit tercapai.' },
+        {
+          error: rateCheck.reason || 'Rate limit tercapai.',
+          upgradeUrl: isOnFreeTier ? UPGRADE_URL : null,
+          tier,
+        },
         { status: 429 }
       )
     }
@@ -119,8 +128,8 @@ Tugas Anda:
       }
     }
 
-    // Fallback: Panggil Gemini langsung secara lokal
-    const reply = await chatWithGemini(systemPrompt, messages)
+    // Fallback: Panggil Gemini langsung secara lokal — pakai tier user (paid vs free)
+    const reply = await chatWithGemini(systemPrompt, messages, tier)
 
     return NextResponse.json({ reply })
 

@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Bot, User, Send, Sparkles } from 'lucide-react';
+import { Bot, User, Send, Sparkles, Clock, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import Link from 'next/link';
 
 const quickPrompts = [
   "Analisis pengeluaran bulan ini",
@@ -60,9 +61,21 @@ export default function AIAssistantPage() {
           messages: updatedMessages.filter(m => m.role !== 'system')
         })
       });
-      
+
       const data = await response.json();
-      
+
+      // Rate limit 429 — tampilkan pesan ramah + CTA upgrade
+      if (response.status === 429) {
+        const upgradeHint = data.upgradeUrl
+          ? `\n\n💡 [**Upgrade ke Pro**](/dashboard/settings?tab=subscription) untuk akses tanpa antrian.`
+          : '';
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `⏰ **AI Mode Gratis lagi padat**\n\n${data.error || 'Coba 1 menit lagi.'}${upgradeHint}`,
+        }]);
+        return;
+      }
+
       if (data.reply) {
         setMessages(prev => [...prev, { role: 'ai', content: data.reply }]);
       } else {

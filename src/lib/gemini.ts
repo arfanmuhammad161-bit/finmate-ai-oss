@@ -1,29 +1,51 @@
 import { GoogleGenAI, Type } from '@google/genai'
 
-// Inisialisasi API Keys (Bisa menerima banyak key dipisah koma)
-const rawKeys = process.env.GEMINI_API_KEY || ''
-const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(Boolean)
+// === TIERED API KEY SYSTEM ===
+// FREE keys: untuk user Trial. Bisa multi-key (rotasi saat 429).
+// PAID key: untuk user Pro/Yearly. Single key dari Gemini paid tier (rate limit jauh
+// lebih tinggi). Set di env GEMINI_API_KEY_PAID. Kalau kosong, fallback ke FREE.
+const rawFreeKeys = process.env.GEMINI_API_KEY || ''
+const apiKeys = rawFreeKeys.split(',').map(k => k.trim()).filter(Boolean)
+const paidKey = (process.env.GEMINI_API_KEY_PAID || '').trim()
 let currentKeyIndex = 0
 
 if (apiKeys.length === 0) {
-  console.warn("⚠️ PERINGATAN: GEMINI_API_KEY tidak ditemukan!")
+  console.warn("⚠️ PERINGATAN: GEMINI_API_KEY (free tier) tidak ditemukan!")
+}
+if (!paidKey) {
+  console.log("ℹ️ GEMINI_API_KEY_PAID belum diset. Pro user akan tetap pakai free tier.")
 }
 
-export function getActiveGeminiAI() {
+export type UserTier = 'free' | 'paid'
+
+/** Tentukan tier dari plan subscription. Pro Bulanan/Tahunan = paid. */
+export function tierForPlan(plan: string | undefined | null): UserTier {
+  if (plan === 'monthly' || plan === 'yearly' || plan === 'admin') return 'paid'
+  return 'free'
+}
+
+/** Get active Gemini client berdasar tier. Paid user → paid key (kalau ada), Free → multi-key rotation. */
+export function getActiveGeminiAI(tier: UserTier = 'free') {
+  if (tier === 'paid' && paidKey) {
+    return new GoogleGenAI({ apiKey: paidKey })
+  }
   const key = apiKeys[currentKeyIndex] || ''
   return new GoogleGenAI({ apiKey: key })
 }
 
 export function rotateGeminiKey() {
   if (apiKeys.length <= 1) return false;
-
   currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-  console.log(`🔄 [FAILOVER] Beralih ke Gemini API Key #${currentKeyIndex + 1}`);
+  console.log(`🔄 [FAILOVER] Beralih ke Gemini Free Key #${currentKeyIndex + 1}`);
   return true;
 }
 
 export function getKeysCount() {
   return apiKeys.length;
+}
+
+export function hasPaidKey() {
+  return !!paidKey;
 }
 
 // Tipe respons standar dari AI
@@ -110,67 +132,12 @@ const JSON_SCHEMA = {
   required: ['intent', 'replyText']
 }
 
-// Coba pakai Qwen2.5-VL gratis via OpenRouter sebagai fallback untuk vision
-async function tryQwenFallback(
-  text: string,
-  mediaBase64: string,
-  mimeType: string,
-  systemContext?: string
-): Promise<AiTransactionResult | null> {
-  const openrouterKey = (process.env.OPENROUTER_API_KEY || '').trim()
-  if (!openrouterKey) return null
-  if (!mimeType.startsWith('image/')) return null // Qwen-VL hanya untuk gambar, voice tetap di Gemini
-
-  try {
-    const prompt = buildPrompt(text, systemContext, true) + `\n\nWAJIB respon JSON saja, no markdown wrapper, no penjelasan ekstra.`
-
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://finmate-ai-brown.vercel.app',
-        'X-Title': 'FinMate AI'
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen2.5-vl-72b-instruct:free',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${mediaBase64}` } }
-          ]
-        }],
-        response_format: { type: 'json_object' },
-        temperature: 0.1
-      })
-    })
-
-    if (!res.ok) {
-      console.warn(`⚠️ [Qwen Fallback] HTTP ${res.status}`)
-      return null
-    }
-
-    const data = await res.json()
-    const raw = data?.choices?.[0]?.message?.content
-    if (!raw) return null
-
-    // Bersihkan markdown wrapper jika ada
-    const cleaned = String(raw).replace(/```json/g, '').replace(/```/g, '').trim()
-    const parsed = JSON.parse(cleaned) as AiTransactionResult
-    console.log(`✅ [Qwen Fallback] berhasil`)
-    return parsed
-  } catch (e: any) {
-    console.warn(`⚠️ [Qwen Fallback] gagal: ${e.message}`)
-    return null
-  }
-}
-
 export async function handleTelegramChatWithGemini(
   text: string,
   mediaBase64?: string,
   mimeType?: string,
-  systemContext?: string
+  systemContext?: string,
+  tier: UserTier = 'free'
 ): Promise<AiTransactionResult> {
   const hasMedia = !!(mediaBase64 && mimeType)
   const prompt = buildPrompt(text, systemContext, hasMedia)
@@ -179,16 +146,13 @@ export async function handleTelegramChatWithGemini(
 
   if (mediaBase64 && mimeType) {
     contents[0].parts.push({
-      inlineData: {
-        data: mediaBase64,
-        mimeType: mimeType
-      }
+      inlineData: { data: mediaBase64, mimeType: mimeType }
     })
   }
-
   contents[0].parts.push({ text: prompt })
 
-  const ai = getActiveGeminiAI()
+  const ai = getActiveGeminiAI(tier)
+  // Paid user pakai 2.5-flash (lebih pintar). Free pakai 2.5-flash juga karena harganya gratis di free tier.
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: contents,
@@ -202,52 +166,41 @@ export async function handleTelegramChatWithGemini(
   try {
     let rawText = response.text
     if (!rawText) throw new Error("Respons AI Kosong")
-
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(rawText) as AiTransactionResult
     return parsed
   } catch (error: any) {
     console.error("Gemini parse error:", error)
-    // Coba Qwen sebagai fallback untuk image-based queries
-    if (mediaBase64 && mimeType?.startsWith('image/')) {
-      const qwenResult = await tryQwenFallback(text, mediaBase64, mimeType, systemContext)
-      if (qwenResult) return qwenResult
-    }
     throw new Error(`Parse Error: ${error.message}. Response was: ${response.text?.substring(0, 50)}...`)
   }
 }
 
-export async function chatWithGemini(systemPrompt: string, history: {role: string, content: string, imageBase64?: string, mimeType?: string}[]) {
+export async function chatWithGemini(
+  systemPrompt: string,
+  history: {role: string, content: string, imageBase64?: string, mimeType?: string}[],
+  tier: UserTier = 'free'
+) {
   const contents: any[] = []
-
   contents.push({ role: 'user', parts: [{ text: systemPrompt }] })
   contents.push({ role: 'model', parts: [{ text: 'Baik, saya paham. Saya akan bertindak sesuai instruksi tersebut.' }] })
 
   for (const msg of history) {
     const parts: any[] = []
     if (msg.imageBase64 && msg.mimeType) {
-      parts.push({
-        inlineData: {
-          data: msg.imageBase64,
-          mimeType: msg.mimeType
-        }
-      })
+      parts.push({ inlineData: { data: msg.imageBase64, mimeType: msg.mimeType } })
     }
     parts.push({ text: msg.content || 'Lampiran Gambar' })
-
     contents.push({
       role: msg.role === 'ai' ? 'model' : 'user',
       parts
     })
   }
 
-  const ai = getActiveGeminiAI()
+  const ai = getActiveGeminiAI(tier)
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: contents,
-    config: {
-      temperature: 0.7,
-    }
+    config: { temperature: 0.7 }
   })
 
   try {

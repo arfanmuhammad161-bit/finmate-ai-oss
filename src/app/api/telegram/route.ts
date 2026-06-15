@@ -1,7 +1,19 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { handleTelegramChatWithGemini, rotateGeminiKey, getKeysCount } from '@/lib/gemini'
+import { handleTelegramChatWithGemini, rotateGeminiKey, getKeysCount, tierForPlan, UserTier } from '@/lib/gemini'
+import { checkAiRateLimit, configForPlan } from '@/lib/rateLimit'
+
+const UPGRADE_URL = 'https://finmate-ai-brown.vercel.app/dashboard/settings?tab=subscription'
+
+/** Bangun reply keyboard inline untuk tombol upgrade Pro */
+function upgradeKeyboard() {
+  return {
+    inline_keyboard: [[
+      { text: '⚡ Upgrade ke Pro', url: UPGRADE_URL }
+    ]]
+  }
+}
 
 // Helper untuk fetch file dari Telegram
 async function getTelegramFileBase64(fileId: string): Promise<{ base64: string, mimeType: string }> {
@@ -213,9 +225,38 @@ export async function POST(request: NextRequest) {
 
     // PROCESSING AI GEMINI (Text, Voice, Photo)
     if (text || isVoice || isPhoto) {
+      // Cek rate limit dulu sebelum panggil AI mahal
+      const { data: sub } = await supabaseAdmin
+        .from('subscriptions')
+        .select('plan')
+        .eq('user_id', profile.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      const isAdminUser = chatId.toString() === process.env.ADMIN_TELEGRAM_ID
+      const tier: UserTier = isAdminUser ? 'paid' : tierForPlan(sub?.plan)
+
+      const rateCheck = await checkAiRateLimit(
+        supabaseAdmin,
+        profile.id,
+        configForPlan(sub?.plan),
+        { skip: isAdminUser }
+      )
+      if (!rateCheck.allowed) {
+        // Pesan ramah + tombol upgrade kalau user Free
+        const friendlyMsg = tier === 'free'
+          ? `⏰ *AI Mode Gratis lagi padat*\n\n${rateCheck.reason}\n\n💡 _Upgrade ke Pro untuk akses tanpa antrian._`
+          : `⏰ ${rateCheck.reason}`
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: friendlyMsg,
+          parse_mode: 'Markdown',
+          reply_markup: tier === 'free' ? upgradeKeyboard() : undefined,
+        })
+      }
+
       // Send temporary "typing" or processing message
-      // Note: In Next.js serverless we can't easily stream replies to Webhook, 
-      // but we can send a loading message using Telegram API directly before waiting for Gemini
       const token = process.env.TELEGRAM_BOT_TOKEN
       if (token) {
         await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
@@ -269,8 +310,8 @@ export async function POST(request: NextRequest) {
         systemContext += `\nGunakan data di atas jika pengguna menanyakan riwayat/laporan pengeluarannya.\n`
       }
 
-      const isAdmin = chatId.toString() === process.env.ADMIN_TELEGRAM_ID
-      
+      const isAdmin = isAdminUser
+
       if (isAdmin) {
         // Fetch admin stats
         const { count: userCount } = await supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true })
@@ -292,18 +333,27 @@ export async function POST(request: NextRequest) {
       let retries = 3;
       while (retries > 0) {
         try {
-          aiResult = await handleTelegramChatWithGemini(userPrompt, mediaBase64, mimeType, systemContext)
+          aiResult = await handleTelegramChatWithGemini(userPrompt, mediaBase64, mimeType, systemContext, tier)
           break;
         } catch (err: any) {
           retries--;
           if (retries === 0) {
-            let errorMsg = err.message;
-            if (errorMsg.includes('503') || errorMsg.includes('UNAVAILABLE')) {
-              errorMsg = "Layanan AI sedang sibuk (High Demand). Silakan coba lagi dalam beberapa detik.";
-            } else if (errorMsg.includes('429') || errorMsg.includes('exceeded')) {
-              errorMsg = `Rate Limit tercapai dari total ${getKeysCount()} kunci aktif. Error Asli: ${err.message}`;
+            // Pesan ramah, sembunyikan technical jargon
+            const isBusy = err.message?.includes('503') || err.message?.includes('UNAVAILABLE') || err.message?.includes('429') || err.message?.includes('exceeded')
+            if (isBusy && tier === 'free') {
+              return NextResponse.json({
+                method: 'sendMessage',
+                chat_id: chatId,
+                text: `⏰ *AI Mode Gratis lagi sibuk*\n\nSemua antrian gratis lagi padat. Coba 1-2 menit lagi.\n\n💡 _Upgrade ke Pro untuk akses prioritas tanpa antri._`,
+                parse_mode: 'Markdown',
+                reply_markup: upgradeKeyboard(),
+              })
             }
-            return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `⚠️ Maaf: ${errorMsg}` })
+            return NextResponse.json({
+              method: 'sendMessage',
+              chat_id: chatId,
+              text: `⚠️ Maaf, AI lagi ada gangguan. Coba sebentar lagi.`
+            })
           }
           
           // Jika 429, coba rotate key sebelum retry
