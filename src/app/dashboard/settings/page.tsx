@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { 
+import {
   User, Bell, CreditCard, Bot, Shield, LogOut,
-  CheckCircle2, AlertCircle, ExternalLink, Copy, Clock, Crown, Zap, Loader2, X, Send
+  CheckCircle2, AlertCircle, ExternalLink, Copy, Clock, Crown, Zap, Loader2, X, Send,
+  Sparkles, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -463,99 +464,235 @@ function SettingsContent() {
           {/* Subscription Tab */}
           {activeTab === 'subscription' && (
             <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Status Langganan Anda</CardTitle>
-                  <CardDescription>Kelola paket dan pembayaran Anda.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="bg-gradient-to-br from-primary-50 to-secondary-50 border border-primary-100 rounded-2xl p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
+              {/* HERO STATUS — emosional & berbeda per kondisi */}
+              {isAdmin ? (
+                <Card className="relative overflow-hidden border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
+                  <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-amber-300/30 blur-3xl" />
+                  <CardContent className="relative p-6 sm:p-8">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md">
+                        <Crown className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-white/60 backdrop-blur-sm px-2.5 py-1 rounded-full">Admin Lifetime</span>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-bold text-amber-900 tracking-tight">Akses penuh, selamanya 👑</h3>
+                    <p className="text-sm text-amber-800/80 mt-1 leading-relaxed">Sebagai admin, Anda otomatis dapat akses semua fitur tanpa batas waktu.</p>
+                  </CardContent>
+                </Card>
+              ) : sub?.plan === 'trial' ? (
+                <Card className={cn(
+                  "relative overflow-hidden border-none text-white",
+                  trialDaysLeft <= 3 ? "bg-gradient-to-br from-rose-600 via-orange-500 to-amber-500" : "bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-600"
+                )}>
+                  <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+                  <div className="absolute -bottom-12 -left-10 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+                  <CardContent className="relative p-6 sm:p-7">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className={cn("text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-full", isAdmin ? 'bg-amber-100 text-amber-700' : sub?.plan === 'trial' ? 'bg-orange-100 text-orange-700' : sub?.plan ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700')}>
-                            {isAdmin ? 'Admin Pro' : sub?.plan === 'trial' ? 'Trial Aktif' : sub?.plan === 'monthly' ? 'Pro Bulanan' : sub?.plan === 'yearly' ? 'Pro Tahunan' : 'Memuat...'}
+                          <Clock className="h-4 w-4" />
+                          <span className="text-xs font-bold uppercase tracking-wider bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                            {trialDaysLeft <= 3 ? "Trial hampir habis" : "Trial aktif"}
                           </span>
                         </div>
-                        <h3 className="text-xl font-bold text-text-main">
-                          {isAdmin ? 'Akses Penuh Selamanya (Pro Lifetime)' : sub?.plan === 'trial' ? 'Free Trial — 14 Hari' : sub?.plan === 'monthly' ? 'Paket Bulanan' : sub?.plan === 'yearly' ? 'Paket Tahunan' : 'Memuat paket...'}
+                        <h3 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                          {trialDaysLeft <= 1 ? "Tinggal hari ini!" : trialDaysLeft <= 3 ? `${trialDaysLeft} hari lagi!` : `${trialDaysLeft} hari tersisa`}
                         </h3>
-                        {!isAdmin && <p className="text-text-muted text-sm mt-1">Berakhir pada <strong>{expiresDateStr}</strong></p>}
+                        <p className="text-sm text-white/80 mt-1">Berakhir {expiresDateStr}</p>
                       </div>
-                      {!isAdmin && sub?.plan === 'trial' && (
-                        <div className="text-4xl font-bold text-primary-600">{trialDaysLeft}<span className="text-lg text-text-muted"> hari</span></div>
-                      )}
-                    </div>
-                  </div>
-
-                  {!isAdmin && (
-                    <div>
-                      <h4 className="font-semibold text-text-main mb-4">Pilih Paket</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="border-2 border-primary-500 rounded-2xl p-5 bg-primary-50/50 relative">
-                          <div className="absolute -top-3 left-4 bg-primary-600 text-white text-xs font-bold px-3 py-1 rounded-full">POPULER</div>
-                          <h3 className="text-lg font-bold text-text-main mt-2">Paket Bulanan</h3>
-                          <div className="text-3xl font-bold text-primary-600 my-2">Rp 29.000<span className="text-sm text-text-muted font-normal">/bulan</span></div>
-                          <ul className="text-sm text-text-muted space-y-2 mb-4">
-                            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Semua fitur AI</li>
-                            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Telegram Bot 24/7</li>
-                            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Laporan PDF & Google Doc</li>
-                          </ul>
-                          <Button variant="gradient" className="w-full" onClick={() => handlePayment('monthly')}>
-                            Pilih Paket Ini
-                          </Button>
-                        </div>
-                        <div className="border border-border rounded-2xl p-5 bg-white">
-                          <h3 className="text-lg font-bold text-text-main">Paket Tahunan</h3>
-                          <div className="text-3xl font-bold text-text-main my-2">Rp 249.000<span className="text-sm text-text-muted font-normal">/tahun</span></div>
-                          <div className="text-xs text-green-600 font-semibold mb-2 bg-green-50 px-2 py-1 rounded w-fit">Hemat 28%!</div>
-                          <ul className="text-sm text-text-muted space-y-2 mb-4">
-                            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-500" /> Semua fitur Bulanan</li>
-                            <li className="flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500" /> Prioritas support</li>
-                            <li className="flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500" /> Analisis lebih mendalam</li>
-                          </ul>
-                          <Button variant="outline" className="w-full" onClick={() => handlePayment('yearly')}>
-                            Pilih Paket Ini
-                          </Button>
-                        </div>
+                      <div className="text-center shrink-0">
+                        <div className="text-5xl sm:text-6xl font-extrabold tabular-nums">{trialDaysLeft}</div>
+                        <div className="text-xs uppercase tracking-wider text-white/70 font-bold">hari</div>
                       </div>
                     </div>
-                  )}
+                    <div className="mt-5 pt-5 border-t border-white/15">
+                      <p className="text-sm text-white/90 leading-relaxed">
+                        {trialDaysLeft <= 3
+                          ? "🔥 Upgrade sekarang biar data Anda tidak terkunci. Pakai promo di bawah kalau Anda punya kupon."
+                          : "Nikmati semua fitur AI tanpa batasan selama masa trial Anda."}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : sub?.plan ? (
+                <Card className="relative overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
+                  <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-emerald-300/30 blur-3xl" />
+                  <CardContent className="relative p-6 sm:p-8">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-white/60 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                        {sub?.plan === 'monthly' ? 'Pro Bulanan' : 'Pro Tahunan'} Aktif
+                      </span>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-bold text-emerald-900 tracking-tight">Terima kasih, Pro user! 💚</h3>
+                    <p className="text-sm text-emerald-800/80 mt-1 leading-relaxed">
+                      Paket Anda aktif sampai <strong>{expiresDateStr}</strong>. Dukungan Anda yang bikin FinMate AI bisa terus jalan.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-text-muted" />
+                  </CardContent>
+                </Card>
+              )}
 
-                  <div>
-                    <h4 className="font-semibold text-text-main mb-4">Histori Pembayaran</h4>
-                    <div className="rounded-xl border border-border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50 border-b border-border">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Tanggal</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Paket</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Jumlah</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {paymentHistory.length === 0 ? (
-                            <tr><td colSpan={4} className="px-4 py-6 text-center text-text-muted">Belum ada riwayat pembayaran.</td></tr>
-                          ) : paymentHistory.map((p: any) => (
-                            <tr key={p.id} className="bg-white hover:bg-gray-50">
-                              <td className="px-4 py-3 text-text-muted">
-                                {new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </td>
-                              <td className="px-4 py-3 text-text-main font-medium capitalize">{p.plan}</td>
-                              <td className="px-4 py-3 text-text-main font-semibold">Rp{parseInt(p.amount).toLocaleString('id-ID')}</td>
-                              <td className="px-4 py-3">
-                                <span className={cn(
-                                  "px-2 py-0.5 rounded-full text-xs font-medium",
-                                  p.status === 'LUNAS' ? "bg-green-100 text-green-700" : p.status === 'PENDING' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
-                                )}>{p.status}</span>
-                              </td>
+              {/* PRICING — hanya tampil untuk trial / expired */}
+              {!isAdmin && (sub?.plan === 'trial' || !sub?.plan) && (
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-base">Upgrade ke Pro</CardTitle>
+                    <CardDescription className="text-xs">Lebih murah dari kopi sehari. Bisa berhenti kapan saja.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Bulanan — featured */}
+                      <div className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-600 text-white shadow-lg shadow-primary-200/50">
+                        <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full inline-flex items-center gap-1">
+                              <Sparkles className="h-2.5 w-2.5" />Paling populer
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-bold">Bulanan</h3>
+                          <div className="mt-2 mb-1 flex items-baseline gap-1">
+                            <span className="text-3xl font-extrabold tabular-nums">Rp 29.000</span>
+                            <span className="text-sm text-primary-100">/bulan</span>
+                          </div>
+                          <p className="text-xs text-primary-100 mb-4">Sekitar Rp 970/hari · setara secangkir kopi sachet</p>
+                          <ul className="text-sm space-y-2 mb-5">
+                            <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Semua fitur AI tanpa batas</li>
+                            <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Telegram Bot 24/7</li>
+                            <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Laporan PDF tak terbatas</li>
+                            <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Insight AI mingguan</li>
+                          </ul>
+                          <Button className="w-full bg-white text-primary-700 hover:bg-primary-50 font-bold" onClick={() => handlePayment('monthly')}>
+                            Upgrade Bulanan
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Tahunan */}
+                      <div className="rounded-2xl p-5 border border-border bg-white card-depth">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">Hemat 28%</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-text-main">Tahunan</h3>
+                        <div className="mt-2 mb-1 flex items-baseline gap-1">
+                          <span className="text-3xl font-extrabold text-text-main tabular-nums">Rp 249.000</span>
+                          <span className="text-sm text-text-muted">/tahun</span>
+                        </div>
+                        <p className="text-xs text-text-muted mb-4">Setara Rp 20.750/bulan · hemat <strong className="text-emerald-700">Rp 99.000</strong></p>
+                        <ul className="text-sm text-text-muted space-y-2 mb-5">
+                          <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />Semua fitur Bulanan</li>
+                          <li className="flex items-start gap-2"><Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />Prioritas support</li>
+                          <li className="flex items-start gap-2"><Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />Analisis tahunan lengkap</li>
+                          <li className="flex items-start gap-2"><Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />Early access fitur baru</li>
+                        </ul>
+                        <Button variant="outline" className="w-full" onClick={() => handlePayment('yearly')}>
+                          Upgrade Tahunan
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Trust signals */}
+                    <div className="mt-5 pt-5 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-[11px] text-text-muted">Bisa berhenti kapan saja</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <ShieldCheck className="h-4 w-4 text-primary-500" />
+                        <span className="text-[11px] text-text-muted">Data terenkripsi</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <Sparkles className="h-4 w-4 text-secondary-500" />
+                        <span className="text-[11px] text-text-muted">Punya kupon? Bisa dipakai</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <Bot className="h-4 w-4 text-amber-500" />
+                        <span className="text-[11px] text-text-muted">Open source</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* PAYMENT HISTORY — mobile-friendly */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Riwayat Pembayaran</CardTitle>
+                  <CardDescription className="text-xs">Semua transaksi pembayaran Anda</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {paymentHistory.length === 0 ? (
+                    <div className="text-center py-10 text-text-muted">
+                      <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                        <CreditCard className="h-6 w-6 text-gray-400" />
+                      </div>
+                      <p className="text-sm font-semibold text-text-main">Belum ada riwayat</p>
+                      <p className="text-xs mt-1">Pembayaran Anda akan tercatat di sini.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop table */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 border-b border-border">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Tanggal</th>
+                              <th className="px-4 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Paket</th>
+                              <th className="px-4 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Jumlah</th>
+                              <th className="px-4 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Status</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {paymentHistory.map((p: any) => (
+                              <tr key={p.id} className="bg-white hover:bg-gray-50">
+                                <td className="px-4 py-3 text-text-muted text-xs">
+                                  {new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </td>
+                                <td className="px-4 py-3 text-text-main font-medium capitalize">{p.plan}</td>
+                                <td className="px-4 py-3 text-text-main font-bold tabular-nums">Rp{parseInt(p.amount).toLocaleString('id-ID')}</td>
+                                <td className="px-4 py-3">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                    p.status === 'LUNAS' ? "bg-green-100 text-green-700" : p.status === 'PENDING' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+                                  )}>{p.status}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Mobile cards */}
+                      <div className="md:hidden divide-y divide-border">
+                        {paymentHistory.map((p: any) => (
+                          <div key={p.id} className="px-4 py-3">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-text-main capitalize">{p.plan}</p>
+                                <p className="text-[11px] text-text-muted">
+                                  {new Date(p.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </p>
+                              </div>
+                              <span className={cn(
+                                "shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                p.status === 'LUNAS' ? "bg-green-100 text-green-700" : p.status === 'PENDING' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+                              )}>{p.status}</span>
+                            </div>
+                            <p className="text-base font-bold text-text-main tabular-nums mt-1">
+                              Rp{parseInt(p.amount).toLocaleString('id-ID')}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
