@@ -27,6 +27,14 @@ interface Transaction {
   description: string;
   date: string;
   source: string;
+  account_name?: string;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  type: string;
+  color: string;
 }
 
 export default function TransactionsPage() {
@@ -47,6 +55,8 @@ function TransactionsContent() {
   const [desc, setDesc] = useState('');
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [accountName, setAccountName] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +79,10 @@ function TransactionsContent() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+  useEffect(() => {
+    fetchTransactions();
+    fetch('/api/accounts').then(r => r.ok ? r.json() : []).then(data => setAccounts(Array.isArray(data) ? data : [])).catch(() => {});
+  }, [fetchTransactions]);
 
   const handleSave = async () => {
     const amountNum = parseInt(amount);
@@ -94,13 +107,14 @@ function TransactionsContent() {
         description: desc,
         category_name: category || (txType === 'income' ? 'Gaji' : 'Lainnya'),
         date,
+        account_name: accountName || null,
         source: 'web'
       });
 
       if (error) throw error;
 
       // Reset form
-      setAmount(''); setDesc(''); setCategory('');
+      setAmount(''); setDesc(''); setCategory(''); setAccountName('');
       setDate(new Date().toISOString().split('T')[0]);
       setShowModal(false);
       toast.success('Transaksi berhasil disimpan.');
@@ -241,9 +255,16 @@ function TransactionsContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-medium">
-                          {trx.category_name || '-'}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-medium">
+                            {trx.category_name || '-'}
+                          </span>
+                          {trx.account_name && (
+                            <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                              {trx.account_name}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-text-muted">{trx.date}</td>
                       <td className={cn("px-6 py-4 text-right font-bold", trx.type === 'income' ? "text-green-600" : "text-text-main")}>
@@ -284,10 +305,15 @@ function TransactionsContent() {
                         <span className={cn("font-bold text-sm", trx.type === 'income' ? "text-green-600" : "text-text-main")}>
                           {trx.type === 'income' ? '+' : '-'} {formatRupiah(trx.amount)}
                         </span>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase">
                             {trx.category_name || '-'}
                           </span>
+                          {trx.account_name && (
+                            <span className="bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                              {trx.account_name}
+                            </span>
+                          )}
                           <button onClick={() => handleDelete(trx.id)} className="p-1 text-red-400 hover:bg-red-50 rounded-md">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -354,6 +380,25 @@ function TransactionsContent() {
                   ))}
                 </div>
               </div>
+
+              {accounts.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-text-main">Dari / Ke Akun <span className="text-text-muted font-normal">(opsional)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setAccountName('')}
+                      className={cn("px-3 py-1.5 rounded-xl border text-xs font-medium transition-all", !accountName ? "border-primary-500 bg-primary-50 text-primary-700" : "border-border text-text-muted hover:border-primary-300")}
+                    >Tanpa Akun</button>
+                    {accounts.map(acc => (
+                      <button
+                        key={acc.id}
+                        onClick={() => setAccountName(acc.name)}
+                        className={cn("px-3 py-1.5 rounded-xl border text-xs font-medium transition-all", accountName === acc.name ? "border-primary-500 bg-primary-50 text-primary-700" : "border-border text-text-muted hover:border-primary-300")}
+                      >{acc.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-text-main">Tanggal</label>

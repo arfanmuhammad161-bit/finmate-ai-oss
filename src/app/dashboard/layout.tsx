@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/Button';
 import { TelegramOnboarding } from '@/components/TelegramOnboarding';
 import { createClient } from '@/lib/supabase/client';
 import {
-  LayoutDashboard, Wallet, PieChart, Target, FileText, Bot, Settings, Shield, Lock, Crown
+  LayoutDashboard, Wallet, PieChart, Target, FileText, Bot, Settings, Shield, Lock, Crown, Building2
 } from 'lucide-react';
 
 const defaultSidebarItems: SidebarItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Transaksi', href: '/dashboard/transactions', icon: Wallet },
+  { name: 'Akun', href: '/dashboard/accounts', icon: Building2 },
   { name: 'Budget', href: '/dashboard/budget', icon: PieChart },
   { name: 'Target', href: '/dashboard/goals', icon: Target },
   { name: 'Laporan', href: '/dashboard/reports', icon: FileText },

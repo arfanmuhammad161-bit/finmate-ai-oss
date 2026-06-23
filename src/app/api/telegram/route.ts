@@ -16,12 +16,14 @@ function upgradeKeyboard() {
   }
 }
 
-/** Menu tombol persisten di bawah input chat — biar user gak perlu hafal command */
+/** Menu tombol persisten di bawah input chat — 7 tombol seperti kompetitor */
 function mainMenuKeyboard() {
   return {
     keyboard: [
       [{ text: '📊 Laporan' }, { text: '💰 Saldo' }],
-      [{ text: '📄 Laporan PDF' }, { text: '❓ Bantuan' }],
+      [{ text: '📂 Kategori' }, { text: '📈 Bandingkan' }],
+      [{ text: '💡 Rekomendasi' }, { text: '📄 Laporan PDF' }],
+      [{ text: '❓ Bantuan' }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -116,6 +118,9 @@ export async function POST(request: NextRequest) {
       '💰 Saldo': '/saldo',
       '📄 Laporan PDF': '/pdf',
       '❓ Bantuan': '/help',
+      '📂 Kategori': '/kategori',
+      '📈 Bandingkan': '/bandingkan',
+      '💡 Rekomendasi': '/rekomendasi',
     }
     if (buttonMap[text]) text = buttonMap[text]
 
@@ -303,6 +308,154 @@ export async function POST(request: NextRequest) {
         chat_id: chatId,
         text: `⚠️ Bot token tidak tersedia.`
       })
+    }
+
+    // Handle /kategori — breakdown pengeluaran per kategori bulan ini
+    if (text === '/kategori') {
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' })
+
+      const { data: txs } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount, category_name')
+        .eq('user_id', profile.id)
+        .eq('type', 'expense')
+        .gte('date', monthStart)
+
+      if (!txs || txs.length === 0) {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `📂 Belum ada pengeluaran yang tercatat bulan *${monthName}*.\n\nMulai catat dengan mengetik, misal: _"makan siang 25rb"_`,
+          parse_mode: 'Markdown',
+        })
+      }
+
+      const breakdown: Record<string, number> = {}
+      let total = 0
+      for (const t of txs) {
+        const cat = t.category_name || 'Lainnya'
+        breakdown[cat] = (breakdown[cat] || 0) + Number(t.amount)
+        total += Number(t.amount)
+      }
+      const sorted = Object.entries(breakdown).sort((a, b) => b[1] - a[1])
+      const lines = sorted.map(([cat, amt], i) => {
+        const pct = Math.round((amt / total) * 100)
+        const bar = '▓'.repeat(Math.round(pct / 10)).padEnd(10, '░')
+        return `${i + 1}. *${cat}*\n   ${bar} ${pct}% — Rp${amt.toLocaleString('id-ID')}`
+      }).join('\n\n')
+
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `📂 *Pengeluaran per Kategori — ${monthName}*\n\n${lines}\n\n💸 *Total: Rp${total.toLocaleString('id-ID')}*`,
+        parse_mode: 'Markdown',
+      })
+    }
+
+    // Handle /bandingkan — bulan ini vs bulan lalu
+    if (text === '/bandingkan') {
+      const now = new Date()
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
+
+      const [{ data: thisTxs }, { data: lastTxs }] = await Promise.all([
+        supabaseAdmin.from('transactions').select('type, amount').eq('user_id', profile.id).gte('date', thisMonthStart),
+        supabaseAdmin.from('transactions').select('type, amount').eq('user_id', profile.id).gte('date', lastMonthStart).lte('date', lastMonthEnd),
+      ])
+
+      const calc = (txs: any[]) => ({
+        income: txs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+        expense: txs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+      })
+
+      const thisM = calc(thisTxs || [])
+      const lastM = calc(lastTxs || [])
+      const fmt = (n: number) => `Rp${n.toLocaleString('id-ID')}`
+      const delta = (a: number, b: number) => {
+        if (b === 0) return ''
+        const pct = Math.round(((a - b) / b) * 100)
+        return pct > 0 ? ` _(+${pct}%)_` : pct < 0 ? ` _(${pct}%)_` : ''
+      }
+
+      const thisMonthName = now.toLocaleString('id-ID', { month: 'long' })
+      const lastMonthName = new Date(now.getFullYear(), now.getMonth() - 1).toLocaleString('id-ID', { month: 'long' })
+
+      return NextResponse.json({
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `📈 *Perbandingan Keuangan*\n\n` +
+          `*Bulan Ini (${thisMonthName})*\n` +
+          `💚 Pemasukan: ${fmt(thisM.income)}${delta(thisM.income, lastM.income)}\n` +
+          `❤️ Pengeluaran: ${fmt(thisM.expense)}${delta(thisM.expense, lastM.expense)}\n` +
+          `💙 Net: ${fmt(thisM.income - thisM.expense)}\n\n` +
+          `*Bulan Lalu (${lastMonthName})*\n` +
+          `💚 Pemasukan: ${fmt(lastM.income)}\n` +
+          `❤️ Pengeluaran: ${fmt(lastM.expense)}\n` +
+          `💙 Net: ${fmt(lastM.income - lastM.expense)}`,
+        parse_mode: 'Markdown',
+      })
+    }
+
+    // Handle /rekomendasi — AI recommendation berdasarkan data 3 bulan
+    if (text === '/rekomendasi') {
+      const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
+      if (token) {
+        await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, action: 'typing' })
+        }).catch(() => {})
+      }
+
+      const threeMonthsAgo = new Date()
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+
+      const { data: txs } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount, category_name, date')
+        .eq('user_id', profile.id)
+        .gte('date', threeMonthsAgo.toISOString().split('T')[0])
+
+      const totalExpense = (txs || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+      const totalIncome = (txs || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+      const catBreakdown: Record<string, number> = {}
+      for (const t of txs || []) {
+        if (t.type === 'expense') {
+          const cat = t.category_name || 'Lainnya'
+          catBreakdown[cat] = (catBreakdown[cat] || 0) + Number(t.amount)
+        }
+      }
+      const topCats = Object.entries(catBreakdown).sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([cat, amt]) => `${cat}: Rp${amt.toLocaleString('id-ID')}`).join(', ')
+
+      const { data: sub } = await supabaseAdmin.from('subscriptions').select('plan').eq('user_id', profile.id).eq('status', 'active').maybeSingle()
+      const tier = tierForPlan(sub?.plan)
+
+      const prompt = `Berdasarkan data keuangan 3 bulan terakhir user:
+- Total Pemasukan: Rp${totalIncome.toLocaleString('id-ID')}
+- Total Pengeluaran: Rp${totalExpense.toLocaleString('id-ID')}
+- Kategori terbesar: ${topCats}
+- Tabungan: Rp${(totalIncome - totalExpense).toLocaleString('id-ID')}
+
+Berikan 3-5 rekomendasi budget yang spesifik dan actionable dalam format Telegram Markdown. Gunakan emoji. Maksimal 200 kata. Langsung ke poin, tanpa basa-basi pembuka.`
+
+      try {
+        const aiResult = await handleTelegramChatWithGemini(prompt, undefined, undefined, '', tier)
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `💡 *Rekomendasi Budget untuk Anda*\n\n${aiResult.replyText}`,
+          parse_mode: 'Markdown',
+        })
+      } catch {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `⚠️ Gagal memuat rekomendasi AI. Coba lagi sebentar.`,
+        })
+      }
     }
 
     // Handle /saldo command
@@ -527,6 +680,7 @@ export async function POST(request: NextRequest) {
             description: parsed.description,
             category_name: parsed.category,
             date: useDate,
+            account_name: parsed.account || null,
             source: 'telegram',
             ai_parsed: true
           })
@@ -536,7 +690,8 @@ export async function POST(request: NextRequest) {
         let replyText = aiResult.replyText + `\n\n✨ *Mencatat ${aiResult.transactions.length} Transaksi:*\n`
         for (const parsed of aiResult.transactions) {
           const typeText = parsed.type === 'income' ? '💚' : '❤️'
-          replyText += `${typeText} ${parsed.description}: Rp${parsed.amount.toLocaleString('id-ID')}\n`
+          const accText = parsed.account ? ` _(${parsed.account})_` : ''
+          replyText += `${typeText} ${parsed.description}: Rp${parsed.amount.toLocaleString('id-ID')}${accText}\n`
         }
         if (aiResult.transactions.length > 1 && totalAmount > 0) {
           replyText += `\n💰 *Total pengeluaran: Rp${totalAmount.toLocaleString('id-ID')}*`

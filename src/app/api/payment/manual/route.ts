@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Paket tidak valid' }, { status: 400 });
     }
 
-    const baseAmount = plan === 'monthly' ? 29000 : 249000;
+    const baseAmount = plan === 'monthly' ? 10000 : 89000;
     let finalAmount = baseAmount;
     let isFree = false;
     let validCoupon = null;

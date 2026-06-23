@@ -141,7 +141,7 @@ function SettingsContent() {
     setShowPaymentModal(true);
   };
 
-  const getBasePrice = () => selectedPlan === 'monthly' ? 29000 : 249000;
+  const getBasePrice = () => selectedPlan === 'monthly' ? 10000 : 89000;
   
   const getFinalPrice = () => {
     const base = getBasePrice();
@@ -637,10 +637,10 @@ function SettingsContent() {
                           </div>
                           <h3 className="text-xl font-bold">Bulanan</h3>
                           <div className="mt-2 mb-1 flex items-baseline gap-1">
-                            <span className="text-3xl font-extrabold tabular-nums">Rp 29.000</span>
+                            <span className="text-3xl font-extrabold tabular-nums">Rp 10.000</span>
                             <span className="text-sm text-primary-100">/bulan</span>
                           </div>
-                          <p className="text-xs text-primary-100 mb-4">Sekitar Rp 970/hari · setara secangkir kopi sachet</p>
+                          <p className="text-xs text-primary-100 mb-4">Sekitar Rp 333/hari · lebih murah dari kopi sachet</p>
                           <ul className="text-sm space-y-2 mb-5">
                             <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Semua fitur AI tanpa batas</li>
                             <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-white mt-0.5 shrink-0" />Telegram Bot 24/7</li>
@@ -656,14 +656,14 @@ function SettingsContent() {
                       {/* Tahunan */}
                       <div className="rounded-2xl p-5 border border-border bg-white card-depth">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">Hemat 28%</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">Hemat 26%</span>
                         </div>
                         <h3 className="text-xl font-bold text-text-main">Tahunan</h3>
                         <div className="mt-2 mb-1 flex items-baseline gap-1">
-                          <span className="text-3xl font-extrabold text-text-main tabular-nums">Rp 249.000</span>
+                          <span className="text-3xl font-extrabold text-text-main tabular-nums">Rp 89.000</span>
                           <span className="text-sm text-text-muted">/tahun</span>
                         </div>
-                        <p className="text-xs text-text-muted mb-4">Setara Rp 20.750/bulan · hemat <strong className="text-emerald-700">Rp 99.000</strong></p>
+                        <p className="text-xs text-text-muted mb-4">Setara Rp 7.400/bulan · hemat <strong className="text-emerald-700">Rp 31.000</strong></p>
                         <ul className="text-sm text-text-muted space-y-2 mb-5">
                           <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />Semua fitur Bulanan</li>
                           <li className="flex items-start gap-2"><Zap className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />Prioritas support</li>

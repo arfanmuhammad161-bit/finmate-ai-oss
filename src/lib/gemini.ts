@@ -57,7 +57,8 @@ export interface AiTransactionResult {
     amount: number
     description: string
     category: string
-    date?: string // YYYY-MM-DD, optional - kalau ada di struk
+    date?: string  // YYYY-MM-DD, optional
+    account?: string // e.g. "Kas", "BRI", "BCA", "GoPay"
   }[]
 }
 
@@ -80,6 +81,7 @@ ${hasMedia ? `
 6. Kategorikan tiap item sesuai konteksnya (makanan ke "Makanan", minum di kafe ke "Makanan", tisu/sabun ke "Belanja", dll).
 7. Description harus singkat dan jelas (maks 40 karakter). Misal: "Indomie Goreng" bukan "INDOMIE INSTANT GORENG SEMUR DAGING".
 8. replyText harus konfirmasi sopan + total semua item yang berhasil dicatat.
+9. Kalau ada kata "dari", "ke", "pakai", atau "via" diikuti nama bank/dompet digital, masukkan ke field "account". Contoh: "beli bensin 50rb dari BRI" → account: "BRI". "bayar GoPay 30rb" → account: "GoPay". Kalau tidak ada info akun, kosongkan.
 
 === ATURAN UNTUK VOICE NOTE ===
 1. Transkripsi audio jadi teks, lalu ekstrak transaksi dari teks tersebut.
@@ -90,6 +92,7 @@ ${hasMedia ? `
 1. Pahami bahasa santai Indonesia ("ngopi 25rb", "abis bensin 50ribu", "terima gaji 5jt").
 2. Konversi notasi singkat: "rb" → ribu, "jt" → juta, "k" → ribu.
 3. Default ke "expense" kecuali jelas pemasukan (gaji, freelance, jual, terima, bonus, dll).
+4. Kalau ada info akun (misal "dari BCA", "cash", "pakai Dana"), isi field "account". Kalau tidak ada, kosongkan.
 
 === FORMAT JSON KEMBALIAN ===
 - intent: salah satu dari "record_transaction", "ask_personal_report", "ask_admin_stats", "general_chat".
@@ -123,7 +126,8 @@ const JSON_SCHEMA = {
           amount: { type: Type.INTEGER },
           description: { type: Type.STRING },
           category: { type: Type.STRING, enum: ["Makanan", "Transportasi", "Hiburan", "Belanja", "Tagihan", "Kesehatan", "Pendidikan", "Gaji", "Freelance", "Lainnya"] },
-          date: { type: Type.STRING }
+          date: { type: Type.STRING },
+          account: { type: Type.STRING }
         },
         required: ['type', 'amount', 'description', 'category']
       }
